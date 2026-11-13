@@ -47,9 +47,10 @@ Svc --> Repo
 Svc --> Ports
 Repo --> DB
 Svc --> RT : publish(sessionId, scope)
+Svc --> Proj : getTeacherView／getTeamView
 RT --> Proj : 產生 TeacherView／TeamView
 RT --> Auth : 驗證連線身分
-RT --> Svc : resolveMember／setOnline
+RT --> Svc : resolveMember／setOnline\n／getTeacherView（確認活動存在、首次狀態）\n／getTeamView（首次狀態）
 RT ..> TDash : teacher:state
 RT ..> Play : team:state（只含本組）
 @enduml

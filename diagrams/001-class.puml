@@ -70,6 +70,7 @@ class SessionService {
   +resolveMember(token: string): Member & {sessionId}
   +getTeamView(memberToken: string): TeamView
   +setOnline(memberId: string, online: boolean): void
+  +loadAggregate(sessionId: string): SessionAggregate
 }
 
 interface Broadcaster {
@@ -100,6 +101,7 @@ class AppError {
 
 note right of SessionService
   001 只實作列出的方法；
+  loadAggregate 供 Broadcaster 載入資料後投影；
   scheduler 與 sheets 依 §7.9 注入，
   由 002、003 使用。
 end note
