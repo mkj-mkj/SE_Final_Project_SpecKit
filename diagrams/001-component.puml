@@ -1,0 +1,53 @@
+@startuml 001-component
+title 001 建立活動與加入 — 組件圖
+skinparam componentStyle uml2
+left to right direction
+
+package "瀏覽器（老師端）" {
+  [老師登入頁\nTeacherLogin] as TLogin
+  [管理頁\nTeacherDashboard] as TDash
+  [老師分頁儲存\n(sessionStorage)] as TStore
+}
+
+package "瀏覽器（學生端）" {
+  [加入頁\nJoin] as Join
+  [作答頁\nPlay] as Play
+  [學生身分儲存\n(localStorage)] as MStore
+}
+
+package "伺服器" {
+  [HTTP 路由\n/api/teacher、/api/public、/api/play] as Http
+  [身分驗證\nAuthService] as Auth
+  [活動服務\nSessionService] as Svc
+  [階段規則\ndomain/phase] as Phase
+  [視圖投影\ndomain/projections] as Proj
+  [即時推播\nBroadcaster / socket] as RT
+  [資料存取\nRepo] as Repo
+}
+
+database "資料庫\n(sessions / teams / members)" as DB
+
+TLogin --> Http : 登入（密碼）
+TDash --> Http : 建立活動／調整設定
+TDash ..> RT : 即時連線（老師身分 + sessionId）
+TLogin --> TStore
+TDash --> TStore
+
+Join --> Http : 查詢房間碼／加入
+Play --> Http : 取得本組狀態
+Play ..> RT : 即時連線（學生身分）
+Join --> MStore
+Play --> MStore
+
+Http --> Auth : 驗證老師身分
+Http --> Svc : 指令
+Svc --> Phase : 檢查允許階段
+Svc --> Repo
+Repo --> DB
+Svc --> RT : publish(sessionId, scope)
+RT --> Proj : 產生 TeacherView／TeamView
+RT --> Auth : 驗證連線身分
+RT --> Svc : resolveMember／setOnline
+RT ..> TDash : teacher:state
+RT ..> Play : team:state（只含本組）
+@enduml

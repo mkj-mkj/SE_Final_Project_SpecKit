@@ -1,0 +1,70 @@
+@startuml 001-sequence
+title 001 建立活動與加入 — 時序圖
+actor 老師 as T
+participant "老師端" as TC
+actor 學生 as S
+participant "學生端" as SC
+participant "AuthService" as Auth
+participant "SessionService" as Svc
+participant "Broadcaster" as BC
+database "資料庫" as DB
+
+== 老師登入並建立活動 ==
+T -> TC : 輸入管理密碼
+TC -> Auth : login(password)
+alt 密碼正確
+  Auth --> TC : teacher token
+  TC -> TC : 存於目前分頁
+else 密碼錯誤
+  Auth --> TC : UNAUTHORIZED
+  TC -> T : 顯示「驗證失敗，請重新登入或加入」
+end
+T -> TC : 建立活動
+TC -> Auth : verifyTeacher(token)
+TC -> Svc : createSession({})
+Svc -> DB : 新增 session（SETUP、6 組、fair、3 秒）\n房間碼重複則重抽（最多 10 次）
+Svc -> BC : publish(sessionId)
+Svc --> TC : TeacherView（房間碼、組別、階段「準備中」）
+TC -> BC : 即時連線 {teacher token, sessionId}
+BC --> TC : teacher:state（目前完整狀態）
+
+== 學生加入 ==
+S -> SC : 輸入房間碼（不分大小寫）
+SC -> Svc : getPublicInfo(roomCode)
+alt 房間碼有效
+  Svc --> SC : 各組名稱與人數
+else 不存在／格式錯誤
+  Svc --> SC : SESSION_NOT_FOUND
+end
+S -> SC : 選組、輸入暱稱
+SC -> Svc : join(roomCode, {teamId, nickname})
+Svc -> Svc : 驗證組別屬於活動、暱稱 1–20 字\n且組內不重複（不分大小寫）
+Svc -> DB : 新增 member、產生 token
+Svc -> BC : publish(sessionId, {teacher, teamIds:[本組]})
+BC --> TC : teacher:state（出現新成員）
+Svc --> SC : {token, memberId, teamId, sessionId}
+SC -> SC : 長期保存學生身分；導向作答頁
+SC -> Svc : getTeamView(token)
+Svc --> SC : TeamView（組名、暱稱、組員、階段）
+SC -> BC : 即時連線 {member token}
+BC -> Svc : resolveMember(token)；setOnline(memberId, true)
+BC --> SC : team:state
+BC --> TC : teacher:state（成員上線）
+
+== 學生斷線後重連 ==
+SC -x BC : 斷線／重新整理
+BC -> Svc : 該成員最後一個連線關閉 → setOnline(memberId, false)
+BC --> TC : teacher:state（成員離線）
+SC -> SC : 讀取保存的學生身分
+SC -> Svc : getTeamView(token)
+alt 身分有效
+  Svc --> SC : TeamView（原組別與暱稱）
+  SC -> BC : 即時連線 {member token}
+  BC -> Svc : setOnline(memberId, true)
+  BC --> SC : team:state（目前完整狀態）
+  BC --> TC : teacher:state（成員上線）
+else 身分失效（UNAUTHORIZED）
+  Svc --> SC : UNAUTHORIZED
+  SC -> SC : 清除身分；導向加入頁並帶入原房間碼
+end
+@enduml

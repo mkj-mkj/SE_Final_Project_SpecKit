@@ -1,0 +1,89 @@
+@startuml 001-class
+title 001 建立活動與加入 — 類別圖
+hide empty members
+
+enum Phase {
+  SETUP <<準備中>>
+  READY <<等待開始>>
+  RUNNING <<搶答中>>
+  ENDED <<已結束>>
+}
+enum FairnessMode {
+  speed
+  fair
+}
+
+class Session {
+  +id: string
+  +roomCode: string
+  +phase: Phase
+  +fairnessMode: FairnessMode
+  +windowSec: number
+  +teamCount: number
+  +round: number
+  +createdAt: number
+}
+class Team {
+  +id: string
+  +sessionId: string
+  +index: number
+  +name: string
+}
+class Member {
+  +id: string
+  +teamId: string
+  +nickname: string
+  +token: string
+  +joinedAt: number
+  +lastSeenAt: number
+}
+
+class AuthService {
+  -password: string
+  -teacherTokens: Set<string>
+  +login(password: string): string
+  +verifyTeacher(token: string | undefined): void
+}
+
+class SessionService {
+  +createSession(input): TeacherView
+  +getCurrentSession(): TeacherView | null
+  +getTeacherView(sessionId: string): TeacherView
+  +updateSettings(sessionId: string, input): TeacherView
+  +getPublicInfo(roomCode: string): PublicSessionInfo
+  +join(roomCode: string, input: {teamId, nickname}): JoinResult
+  +resolveMember(token: string): Member & {sessionId}
+  +getTeamView(memberToken: string): TeamView
+  +setOnline(memberId: string, online: boolean): void
+}
+
+interface Broadcaster {
+  +publish(sessionId: string, scope?: PublishScope): void
+}
+interface Repo
+interface Clock
+interface IdGen {
+  +roomCode(): string
+  +token(): string
+}
+
+class AppError {
+  +code: ErrorCode
+}
+
+Session "1" *-- "2..20" Team : 擁有
+Team "1" *-- "0..*" Member : 擁有
+Session --> Phase
+Session --> FairnessMode
+
+SessionService --> Repo
+SessionService --> Clock
+SessionService --> IdGen
+SessionService --> Broadcaster
+SessionService ..> Session
+SessionService ..> Team
+SessionService ..> Member
+SessionService ..> AppError : throws
+AuthService --> IdGen
+AuthService ..> AppError : throws UNAUTHORIZED
+@enduml
