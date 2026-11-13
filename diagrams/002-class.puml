@@ -1,0 +1,171 @@
+@startuml 002-class
+title 002 匯入 Guided Notes — 類別圖
+hide empty members
+
+package "試算表快照" {
+  class GridRange {
+    +sheetId: number
+    +startRowIndex: number
+    +endRowIndex: number
+    +startColumnIndex: number
+    +endColumnIndex: number
+  }
+  class SheetData {
+    +sheetId: number
+    +title: string
+    +values: string[][]
+    +merges: GridRange[]
+  }
+  class SheetSnapshot {
+    +spreadsheetId: string
+    +sheets: SheetData[]
+  }
+  class CellWrite {
+    +sheetTitle: string
+    +a1: string
+    +value: string
+  }
+}
+
+package "解析結果" {
+  enum ParseWarningCode {
+    NON_CONSECUTIVE_NUMBERS
+    SUBNO_MISMATCH
+  }
+  class ParseWarning {
+    +code: ParseWarningCode
+    +message: string
+    +questionNumber?: number
+  }
+  class ParseResult {
+    +sheetTitle: string
+    +headerRow: number
+    +numberCol: number
+    +answerCol: number
+    +questions: ParsedQuestion[]
+    +warnings: ParseWarning[]
+  }
+  class ParsedQuestion {
+    +number: number
+    +isGroup: boolean
+    +slots: ParsedSlot[]
+  }
+  class ParsedSlot {
+    +subNo: number
+    +sheetTitle: string
+    +row: number
+    +col: number
+    +a1: string
+    +prefix: string
+    +originalValue: string
+  }
+  class ImportSummary {
+    +questionCount: number
+    +groupCount: number
+    +singleCount: number
+    +subQuestionCount: number
+    +warnings: ParseWarning[]
+  }
+}
+
+package "保存的實體" {
+  class Session {
+    +id: string
+    +phase: Phase
+    +spreadsheetId: string | null
+    +sheetTitle: string | null
+  }
+  class Question {
+    +id: string
+    +sessionId: string
+    +number: number
+    +isGroup: boolean
+    +subCount: number
+    +state: QuestionState
+    +windowEndsAt: number | null
+  }
+  class AnswerSlot {
+    +id: string
+    +questionId: string
+    +subNo: number
+    +sheetTitle: string
+    +row: number
+    +col: number
+    +a1: string
+    +prefix: string
+    +originalValue: string
+  }
+  class QuestionInfo {
+    +id: string
+    +number: number
+    +isGroup: boolean
+    +subCount: number
+    +subLabels: string[]
+  }
+}
+
+package "函式模組" {
+  class parser <<module>> {
+    +parseGuidedNotes(snapshot: SheetSnapshot): ParseResult
+    +summarize(result: ParseResult): ImportSummary
+  }
+  class a1 <<module>> {
+    +colToLetters(col: number): string
+    +toA1(row: number, col: number): string
+    +parseSpreadsheetInput(input: string): string
+  }
+  class projections <<module>> {
+    +questionInfo(q: Question, slots: AnswerSlot[]): QuestionInfo
+  }
+}
+
+interface SheetsGateway {
+  +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
+  +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
+}
+class GoogleSheetsGateway <<createGoogleGateway(client)>> {
+  +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
+  +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
+}
+class FakeSheetsGateway <<fakeGateway>> {
+  +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
+  +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
+  +getSnapshot(spreadsheetId: string): SheetSnapshot
+  +reset(): void
+}
+
+class SessionService {
+  +importSheet(sessionId: string, spreadsheetInput: string): Promise<{view: TeacherView, summary: ImportSummary}>
+}
+
+SheetSnapshot "1" *-- "1..*" SheetData
+SheetData "1" *-- "0..*" GridRange
+ParseResult "1" *-- "1..*" ParsedQuestion
+ParseResult "1" *-- "0..*" ParseWarning
+ParsedQuestion "1" *-- "1..*" ParsedSlot
+ParseWarning --> ParseWarningCode
+ImportSummary "1" *-- "0..*" ParseWarning
+
+Session "1" o-- "0..*" Question
+Question "1" *-- "1..*" AnswerSlot
+ParsedQuestion ..> Question : 匯入時轉為
+ParsedSlot ..> AnswerSlot : 匯入時轉為
+projections ..> QuestionInfo : 產生
+
+SheetsGateway <|.. GoogleSheetsGateway
+SheetsGateway <|.. FakeSheetsGateway
+SheetsGateway ..> SheetSnapshot : 回傳
+SheetsGateway ..> CellWrite : 寫回（004 使用）
+
+parser ..> SheetSnapshot : 讀取
+parser ..> ParseResult : 產生
+parser ..> ImportSummary : 產生
+parser ..> a1 : toA1
+
+SessionService --> SheetsGateway : 注入
+SessionService ..> a1 : parseSpreadsheetInput
+SessionService ..> parser
+SessionService ..> Question : 建立／取代
+SessionService ..> AnswerSlot : 建立／取代
+SessionService ..> Session : phase=READY、spreadsheetId、sheetTitle
+@enduml

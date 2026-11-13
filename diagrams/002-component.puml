@@ -1,0 +1,57 @@
+@startuml 002-component
+title 002 匯入 Guided Notes — 組件圖
+skinparam componentStyle uml2
+left to right direction
+
+actor 老師 as T
+
+package "瀏覽器（老師端）" {
+  [管理頁\nTeacherDashboard\n(READY 題號清單，題組標示子題)] as TDash
+  [匯入表單\nImportForm\n(import-input、import-submit)] as Form
+  [匯入摘要\nImportSummary\n(import-summary、import-question-count、\nimport-group-count、import-warning-{i})] as Sum
+  [錯誤橫幅\nErrorBanner\n(HEADER_NOT_FOUND 附格式說明)] as Err
+}
+
+package "伺服器" {
+  [HTTP 路由\nPOST /api/teacher/sessions/:id/import] as Http
+  [匯入服務\nSessionService.importSheet] as Svc
+  [階段規則\ndomain/phase\n(import 僅允許 SETUP、READY)] as Phase
+  [網址解析\nsheets/a1\nparseSpreadsheetInput、toA1] as A1
+  [解析器\nsheets/parser\nparseGuidedNotes、summarize] as Parser
+  [視圖投影\ndomain/projections\nquestionInfo（只含題號與子題標籤）] as Proj
+  [即時推播\nBroadcaster] as BC
+  [資料存取\nRepo\n(sessions、questions、answer_slots、drafts)] as Repo
+
+  interface "SheetsGateway" as GW
+  [Google 試算表閘道\ngoogleGateway\n(SHEETS_MODE=google)] as GG
+  [示範模式閘道\nfakeGateway\n(SHEETS_MODE=fake)] as FG
+}
+
+cloud "Google Sheets" as GS
+folder "fixtures/sheets\n(template-a、template-b\n.snapshot.json)" as FX
+database "資料庫\n(sessions / questions / answer_slots / drafts)" as DB
+
+T --> Form : 貼上網址或 ID，按「匯入」
+TDash --> Form
+TDash --> Sum
+TDash --> Err
+Form --> Http : { spreadsheet }
+
+Http --> Svc : importSheet(sessionId, input)
+Svc --> Phase : 檢查允許階段
+Svc --> A1 : 取出 spreadsheetId
+Svc --> GW : fetchSnapshot(id)
+GW <|.. GG
+GW <|.. FG
+GG --> GS : 讀取工作表、合併範圍、顯示值
+FG --> FX : 讀取範例快照
+Svc --> Parser : parseGuidedNotes(snapshot)
+Parser --> A1 : toA1(row, col)
+Svc --> Repo : 交易內刪除舊題目／作答格／草稿\n寫入新題目、作答格、摘要
+Repo --> DB
+Svc --> BC : publish(sessionId)
+BC --> Proj : TeacherView／TeamView
+BC ..> TDash : teacher:state（題號清單、importSummary）
+Http ..> Sum : 200 { view, summary }
+Http ..> Err : 4xx/5xx 錯誤碼
+@enduml
