@@ -1,10 +1,11 @@
 // 組裝測試用 SessionService（TEST_SPEC §3）。
-// 001：snapshots 預設為空物件（research R-04）；002 起改為預設載入兩份 fixture。
+// snapshots 預設載入兩份 fixture（TECH_SPEC §14.1 002）；有傳入 opts.snapshots 時以傳入值為準。
 import type { SheetSnapshot } from '@quiz/shared';
 import { openDb } from '../../src/db/db.js';
 import { Repo } from '../../src/db/repo.js';
 import { SessionService } from '../../src/services/sessionService.js';
 import { FakeClock } from './fakeClock.js';
+import { loadSnapshot } from './fixtures.js';
 import { InMemorySheetsGateway } from './inMemorySheets.js';
 import { ManualScheduler } from './manualScheduler.js';
 import { RecordingBroadcaster } from './recordingBroadcaster.js';
@@ -23,7 +24,12 @@ export function makeTestService(opts?: { snapshots?: Record<string, SheetSnapsho
   const clock = new FakeClock();
   const scheduler = new ManualScheduler(clock);
   const ids = new SeqIdGen(opts?.roomCodes);
-  const gateway = new InMemorySheetsGateway(opts?.snapshots ?? {});
+  const gateway = new InMemorySheetsGateway(
+    opts?.snapshots ?? {
+      'fixture-template-a': loadSnapshot('template-a'),
+      'fixture-template-b': loadSnapshot('template-b'),
+    },
+  );
   const broadcaster = new RecordingBroadcaster();
   const service = new SessionService({ repo, clock, scheduler, ids, sheets: gateway, broadcaster });
   return { service, repo, clock, scheduler, ids, gateway, broadcaster };

@@ -14,7 +14,7 @@ package "瀏覽器（老師端）" {
 }
 
 package "伺服器" {
-  [啟動與設定\nindex.ts / config.ts\n(依 SHEETS_MODE 組裝 gateway)] as Boot
+  [啟動與設定\nindex.ts（組裝 gateway）／app.ts（掛載 devRoutes）\n(config.ts 提供 SHEETS_MODE 等設定)] as Boot
   [HTTP 路由\nPOST /api/teacher/sessions/:id/import] as Http
   [開發用路由 devRoutes\n(只在 SHEETS_MODE=fake 掛載)\nGET /api/dev/fake-sheets/:id\nPOST /api/dev/fake-sheets/:id/reset] as Dev
   [匯入服務\nSessionService.importSheet] as Svc

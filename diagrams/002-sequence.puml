@@ -28,7 +28,8 @@ P -> P : 4–5. 題號格縱向合併 n>1 → 題組；\n   否則後備規則�
 P -> P : 6–8. 取前綴（n）/(n) 與 originalValue；\n   子題編號不符 → SUBNO_MISMATCH 並重編
 P -> P : 9–10. 檢查無題目／題號重複；\n   不連續（含 0）→ NON_CONSECUTIVE_NUMBERS；依題號排序
 P --> Svc : ParseResult
-Svc -> Svc : summarize(result) → ImportSummary
+Svc -> P : summarize(result)
+P --> Svc : ImportSummary
 Svc -> DB : 交易：\n① 重新讀 session 並 assertPhase（讀取期間若已開始搶答 → INVALID_PHASE）\n② 刪除舊 questions（answer_slots、drafts 連帶刪除）\n③ 新增 Question、AnswerSlot（位置、前綴、原始內容）\n④ 更新 session（spreadsheetId、sheetTitle、import_summary、phase=READY）
 Svc -> BC : publish(sessionId)
 BC --> TC : teacher:state（題號清單、importSummary）

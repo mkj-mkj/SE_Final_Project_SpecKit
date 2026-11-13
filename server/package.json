@@ -13,6 +13,7 @@
     "@quiz/shared": "*",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "googleapis": "^190.0.0",
     "socket.io": "^4.8.1",
     "zod": "^3.24.1"
   },

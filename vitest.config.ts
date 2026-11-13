@@ -11,6 +11,7 @@ export default defineConfig({
         lines: 80,
         branches: 75,
         'server/src/domain/**': { lines: 95, branches: 90 },
+        'server/src/sheets/parser.ts': { lines: 95, branches: 90 },
         'server/src/services/**': { lines: 90, branches: 85 },
         'shared/src/**': { lines: 90, branches: 85 },
       },

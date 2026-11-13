@@ -1,5 +1,5 @@
-// 活動服務（TECH_SPEC §7.9）。001 只實作 createSession、getCurrentSession、getTeacherView、
-// updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline。
+// 活動服務（TECH_SPEC §7.9）。001：createSession、getCurrentSession、getTeacherView、
+// updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline；002：importSheet。
 import {
   AppError,
   DEFAULT_FAIRNESS_MODE,
@@ -13,6 +13,7 @@ import {
   normalizeNickname,
   normalizeRoomCode,
   type FairnessMode,
+  type ImportSummary,
   type Member,
   type PublicSessionInfo,
   type Session,
@@ -22,13 +23,15 @@ import {
 import { z } from 'zod';
 import { withTransaction } from '../db/db.js';
 import type { Repo } from '../db/repo.js';
-import { assertPhase } from '../domain/phase.js';
+import { assertPhase, nextPhase } from '../domain/phase.js';
 import { projectTeacherView, projectTeamView, type SessionAggregate } from '../domain/projections.js';
 import type { Clock } from '../ports/clock.js';
 import type { IdGen } from '../ports/ids.js';
 import type { Scheduler } from '../ports/scheduler.js';
 import type { SheetsGateway } from '../ports/sheetsGateway.js';
 import type { Broadcaster } from '../realtime/broadcaster.js';
+import { parseSpreadsheetInput } from '../sheets/a1.js';
+import { parseGuidedNotes, summarize } from '../sheets/parser.js';
 
 export interface ServiceDeps {
   repo: Repo;
@@ -73,18 +76,19 @@ export class SessionService {
     return s;
   }
 
-  /** 載入活動完整資料（供投影與 broadcaster 使用）；001 沒有題目與作答，相關陣列為空 */
+  /** 載入活動完整資料（供投影與 broadcaster 使用）；草稿與送出紀錄由 003 補上 */
   loadAggregate(sessionId: string): SessionAggregate {
     const { repo } = this.deps;
     return {
       session: this.requireSession(sessionId),
-      questions: [],
-      slots: [],
+      questions: repo.listQuestions(sessionId),
+      slots: repo.listSlotsBySession(sessionId),
       teams: repo.listTeams(sessionId),
       members: repo.listMembersBySession(sessionId),
       drafts: [],
       submissions: [],
       onlineMemberIds: new Set(this.onlineMemberIds),
+      importSummary: repo.getImportSummary(sessionId),
     };
   }
 
@@ -169,6 +173,63 @@ export class SessionService {
     });
     broadcaster.publish(sessionId);
     return this.getTeacherView(sessionId);
+  }
+
+  /**
+   * 匯入 Guided Notes（TECH_SPEC §7.9、research R-05；FR-01）：
+   * 1) 交易外：檢查階段 → 解析網址（無效時不讀取試算表）→ 讀取快照 → 解析與摘要；
+   * 2) 單一交易內：重新檢查階段（讀取期間老師可能已開始搶答）→ 刪除舊題目（作答格、草稿連帶刪除）
+   *    → 寫入新題目與作答格 → 更新試算表 ID、工作表名稱與階段 → 保存摘要；
+   * 3) 推播給老師與全部組。任何錯誤都不寫入、不推播（全有或全無，FR-019）。
+   * 重疊的多次匯入各自在交易內整批取代，最後完成者為最終結果（FR-001a）。
+   */
+  async importSheet(
+    sessionId: string,
+    spreadsheetInput: string,
+  ): Promise<{ view: TeacherView; summary: ImportSummary }> {
+    const { repo, ids, sheets, broadcaster } = this.deps;
+    assertPhase(this.requireSession(sessionId).phase, 'import');
+    const spreadsheetId = parseSpreadsheetInput(spreadsheetInput);
+    const snapshot = await sheets.fetchSnapshot(spreadsheetId);
+    const result = parseGuidedNotes(snapshot);
+    const summary = summarize(result);
+
+    withTransaction(repo.db, () => {
+      const session = this.requireSession(sessionId);
+      const phase = nextPhase(session.phase, 'import'); // 內含 assertPhase：不允許時丟 INVALID_PHASE
+      repo.deleteQuestionsBySession(sessionId);
+      for (const pq of result.questions) {
+        const questionId = ids.id('q');
+        repo.insertQuestion({
+          id: questionId,
+          sessionId,
+          number: pq.number,
+          isGroup: pq.isGroup,
+          subCount: pq.slots.length,
+          state: 'open',
+          windowEndsAt: null,
+        });
+        // 作答格位置只來自解析結果（憲章原則 V），保存原始內容供 004 還原
+        for (const s of pq.slots) {
+          repo.insertSlot({
+            id: ids.id('slot'),
+            questionId,
+            subNo: s.subNo,
+            sheetTitle: s.sheetTitle,
+            row: s.row,
+            col: s.col,
+            a1: s.a1,
+            prefix: s.prefix,
+            originalValue: s.originalValue,
+          });
+        }
+      }
+      repo.updateSession({ ...session, spreadsheetId, sheetTitle: result.sheetTitle, phase });
+      repo.setImportSummary(sessionId, summary);
+    });
+
+    broadcaster.publish(sessionId);
+    return { view: this.getTeacherView(sessionId), summary };
   }
 
   // ---------- 學生 ----------

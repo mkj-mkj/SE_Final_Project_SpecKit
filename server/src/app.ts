@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import express, { type Express } from 'express';
 import { Server } from 'socket.io';
 import type { Repo } from './db/repo.js';
+import { devRoutes } from './http/devRoutes.js';
 import { errorHandler } from './http/errorHandler.js';
 import { playRoutes } from './http/playRoutes.js';
 import { publicRoutes } from './http/publicRoutes.js';
@@ -13,6 +14,7 @@ import type { Clock } from './ports/clock.js';
 import type { IdGen } from './ports/ids.js';
 import type { Scheduler } from './ports/scheduler.js';
 import type { SheetsGateway } from './ports/sheetsGateway.js';
+import type { createFakeGateway } from './sheets/fakeGateway.js';
 import { createSocketBroadcaster, nullBroadcaster, type Broadcaster } from './realtime/broadcaster.js';
 import { attachSocket } from './realtime/socket.js';
 import type { AuthService } from './services/authService.js';
@@ -25,6 +27,8 @@ export interface AppDeps {
   ids: IdGen;
   sheets: SheetsGateway;
   auth: AuthService;
+  /** 只在 SHEETS_MODE=fake 時提供；有提供才掛載 /api/dev（TECH_SPEC §8.4） */
+  fakeSheets?: ReturnType<typeof createFakeGateway>;
 }
 
 // 前端建置結果：app.ts 位於 server/src 或 server/dist，往上兩層為專案根目錄（不依賴 process.cwd()）
@@ -46,6 +50,7 @@ export function createApp(deps: AppDeps): { app: Express; httpServer: HttpServer
   app.use('/api/teacher', teacherRoutes(deps.auth, service));
   app.use('/api/public', publicRoutes(service));
   app.use('/api/play', playRoutes(service));
+  if (deps.fakeSheets) app.use('/api/dev', devRoutes(deps.fakeSheets));
 
   if (existsSync(CLIENT_DIST)) {
     app.use(express.static(CLIENT_DIST));

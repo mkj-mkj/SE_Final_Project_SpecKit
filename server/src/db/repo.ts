@@ -1,5 +1,16 @@
-// 型別化的資料存取（TECH_SPEC §5）。001 只實作 sessions、teams、members。
-import { AppError, type FairnessMode, type Member, type Phase, type Session, type Team } from '@quiz/shared';
+// 型別化的資料存取（TECH_SPEC §5）。001：sessions、teams、members；002：questions、answer_slots、import_summary。
+import {
+  AppError,
+  type AnswerSlot,
+  type FairnessMode,
+  type ImportSummary,
+  type Member,
+  type Phase,
+  type Question,
+  type QuestionState,
+  type Session,
+  type Team,
+} from '@quiz/shared';
 import type { Db } from './db.js';
 
 type Row = Record<string, unknown>;
@@ -38,6 +49,32 @@ function toMember(r: Row): Member {
     token: r.token as string,
     joinedAt: Number(r.joined_at),
     lastSeenAt: Number(r.last_seen_at),
+  };
+}
+
+function toQuestion(r: Row): Question {
+  return {
+    id: r.id as string,
+    sessionId: r.session_id as string,
+    number: Number(r.number),
+    isGroup: Number(r.is_group) === 1,
+    subCount: Number(r.sub_count),
+    state: r.state as QuestionState,
+    windowEndsAt: r.window_ends_at === null ? null : Number(r.window_ends_at),
+  };
+}
+
+function toSlot(r: Row): AnswerSlot {
+  return {
+    id: r.id as string,
+    questionId: r.question_id as string,
+    subNo: Number(r.sub_no),
+    sheetTitle: r.sheet_title as string,
+    row: Number(r.row),
+    col: Number(r.col),
+    a1: r.a1 as string,
+    prefix: r.prefix as string,
+    originalValue: r.original_value as string,
   };
 }
 
@@ -189,5 +226,64 @@ export class Repo {
     this.db
       .prepare('UPDATE members SET last_seen_at = $lastSeenAt WHERE id = $memberId')
       .run({ memberId, lastSeenAt });
+  }
+
+  // ---------- 匯入摘要（sessions.import_summary，JSON） ----------
+  /** 未匯入時為 null */
+  getImportSummary(sessionId: string): ImportSummary | null {
+    const r = this.db.prepare('SELECT import_summary FROM sessions WHERE id = $sessionId').get({ sessionId }) as
+      | Row
+      | undefined;
+    const raw = r?.import_summary as string | null | undefined;
+    return raw ? (JSON.parse(raw) as ImportSummary) : null;
+  }
+
+  setImportSummary(sessionId: string, summary: ImportSummary): void {
+    this.db
+      .prepare('UPDATE sessions SET import_summary = $summary WHERE id = $sessionId')
+      .run({ sessionId, summary: JSON.stringify(summary) });
+  }
+
+  // ---------- questions、answer_slots ----------
+  /** 刪除該活動所有題目；answer_slots、drafts、submissions 以 ON DELETE CASCADE 連帶刪除 */
+  deleteQuestionsBySession(sessionId: string): void {
+    this.db.prepare('DELETE FROM questions WHERE session_id = $sessionId').run({ sessionId });
+  }
+
+  insertQuestion(q: Question): void {
+    this.db
+      .prepare(
+        `INSERT INTO questions (id, session_id, number, is_group, sub_count, state, window_ends_at)
+         VALUES ($id, $sessionId, $number, $isGroup, $subCount, $state, $windowEndsAt)`,
+      )
+      .run({ ...q, isGroup: q.isGroup ? 1 : 0 });
+  }
+
+  insertSlot(s: AnswerSlot): void {
+    this.db
+      .prepare(
+        `INSERT INTO answer_slots (id, question_id, sub_no, sheet_title, row, col, a1, prefix, original_value)
+         VALUES ($id, $questionId, $subNo, $sheetTitle, $row, $col, $a1, $prefix, $originalValue)`,
+      )
+      .run({ ...s });
+  }
+
+  /** 依題號升冪 */
+  listQuestions(sessionId: string): Question[] {
+    const rows = this.db
+      .prepare('SELECT * FROM questions WHERE session_id = $sessionId ORDER BY number')
+      .all({ sessionId }) as Row[];
+    return rows.map(toQuestion);
+  }
+
+  /** 該活動所有作答格，依題目、子題編號排序 */
+  listSlotsBySession(sessionId: string): AnswerSlot[] {
+    const rows = this.db
+      .prepare(
+        `SELECT s.* FROM answer_slots s JOIN questions q ON q.id = s.question_id
+         WHERE q.session_id = $sessionId ORDER BY q.number, s.sub_no`,
+      )
+      .all({ sessionId }) as Row[];
+    return rows.map(toSlot);
   }
 }
