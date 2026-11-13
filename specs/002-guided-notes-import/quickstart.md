@@ -14,7 +14,7 @@ npm run test:e2e         # E2E-01、E2E-02（及 001 的 E2E-03、E2E-18）
 npm run lint
 ```
 
-期望：全部通過；`git grep -nE "['\"][A-Z]{1,2}[0-9]+['\"]" server/src` 不應出現寫死的儲存格位址（測試與 fixtures 除外）。
+期望：全部通過；`git grep -nE "['\"][A-Z]{1,3}[0-9]+['\"]" server/src` 不應出現寫死的儲存格位址（測試與 fixtures 除外）。
 
 ## 2. 示範模式手動驗證
 
@@ -22,7 +22,7 @@ npm run lint
 2. 輸入 `fixture-template-a` 按「匯入」：按鈕短暫顯示「匯入中…」；2 秒內出現「偵測到 4 題，其中 2 題組（共 4 子題）、2 單題」；清單為「第 1 題 題組（1）（2）」「第 2 題 題組（1）（2）」「第 3 題」「第 4 題」；階段「等待開始」。
 3. 輸入 `fixture-template-b` 重新匯入：6 題、0 題組；舊題目不再出現。
 4. 輸入 `hello` → 「不是有效的 Google Sheets 網址」；輸入 `fixture-nope` → 「找不到試算表」；階段不變。
-5. 以學生分頁加入後重新匯入，學生等待畫面的題號清單即時更新；畫面不出現題目敘述。
+5. 以學生分頁加入後重新匯入，以瀏覽器開發者工具確認學生收到的 `team:state` 中 `questions` 即時更新且不含題目敘述（學生畫面的題號顯示屬 003 的 AnswerCard）。
 6. 重新整理老師頁，摘要與題號清單仍在。
 7. `GET /api/dev/fake-sheets/fixture-template-a` 回傳快照；`POST …/reset` 回 204。
 8. README 列出 `fixture-template-a`、`fixture-template-b`（MA-09）。

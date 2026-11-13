@@ -29,7 +29,7 @@
 
 **Storage**: SQLite（`node:sqlite`）；讀寫 `sessions`（phase、spreadsheet_id、sheet_title、import_summary）、`questions`、`answer_slots`；`drafts` 隨 questions 連帶刪除。fake 模式的試算表快照存記憶體（讀自 `fixtures/sheets`）。
 
-**Testing**: Vitest 2（coverage-v8；`sheets` 模組行覆蓋率 ≥ 95%）、jsdom + @testing-library/react、supertest、Playwright（`channel: 'msedge'`）；fixtures：`fixtures/sheets/template-{a,b}.snapshot.json`、`.expected.json`
+**Testing**: Vitest 2（coverage-v8；門檻依 TEST_SPEC §2.3：`server/src/sheets/parser.ts` 與 `server/src/domain/**` 行 ≥ 95%／分支 ≥ 90%，`server/src/services/**` 90%／85%；`googleGateway.ts` 的實際連網部分可排除並列入排除清單）、jsdom + @testing-library/react、supertest、Playwright（`channel: 'msedge'`）；fixtures：`fixtures/sheets/template-{a,b}.snapshot.json`、`.expected.json`
 
 **Target Platform**: 本機 Windows 11；Edge／Chrome；`localhost`
 
@@ -71,7 +71,7 @@
 | 管理頁 TeacherDashboard | `client/src/pages/TeacherDashboard.tsx` | READY 畫面：ImportForm（SETUP／READY）、ImportSummary、題號清單 |
 | 匯入表單 ImportForm | `client/src/components/ImportForm.tsx` | 全部（含 busy「匯入中…」） |
 | 匯入摘要 ImportSummary | `client/src/components/ImportSummary.tsx` | 全部（固定文字、警告） |
-| 錯誤橫幅 ErrorBanner | `client/src/components/ErrorBanner.tsx`（001） | 不修改；由 ImportForm 引用，HEADER_NOT_FOUND 時 ImportForm 在其下方加顯示範本格式說明（UT-UI-IMPORT-03） |
+| 錯誤橫幅 ErrorBanner | `client/src/components/ErrorBanner.tsx`（001） | 不修改；TeacherDashboard 唯一的錯誤橫幅，顯示 `useTeacher.error`（含匯入錯誤）；ImportForm 不另外渲染 ErrorBanner，HEADER_NOT_FOUND 時只在表單下方顯示範本格式說明（UT-UI-IMPORT-03；analyze M3） |
 | useTeacher.importSheet | `client/src/hooks/useTeacher.ts`（001） | 新增 `importSheet` |
 | 啟動與設定 | `server/src/index.ts`、`server/src/config.ts`（001） | 依 `sheetsMode` 建 googleGateway（GoogleAuth＋`google.sheets`）或 fakeGateway；fake 時傳入 `fakeSheets` 讓 app 掛 devRoutes |
 | HTTP 路由 | `server/src/http/teacherRoutes.ts`（001） | 新增 import 路由 |
@@ -158,7 +158,10 @@ specs/002-guided-notes-import/
 | 需求 | 002 的驗證方式 | 自動化驗證所在 |
 | --- | --- | --- |
 | FR-001a（重疊匯入以最後完成者為準） | 由交易設計保證（research R-05）；quickstart 手動 | —（TEST_SPEC 無案例） |
-| FR-023（重新整理後仍見摘要）、學生即時收到題號 | UT-SVC-IMPORT-01 額外斷言 `getTeacherView().importSummary`；quickstart 步驟 5、6 | 003：IT-SYNC-01 |
+| FR-023（重新整理後仍見摘要）、學生即時收到題號（資料） | UT-SVC-IMPORT-01 額外斷言 `getTeacherView().importSummary` 與 `getTeamView().questions`；quickstart 步驟 5、6 | 003：IT-SYNC-01 |
+| 學生等待畫面顯示題號（PRD §5.2 步驟 2；spec US1 情境 6、US4 情境 4） | 002 只提供 `TeamView.questions`；畫面由 003 的 AnswerCard「phase ≠ RUNNING」狀態實作（TECH_SPEC §10.4、§14.1 003 列），002 不修改 `Play.tsx` | 003：UT-UI-CARD |
+| FR-019（「等待開始」重新匯入失敗保留舊題目與摘要；spec US4 情境 2） | UT-SVC-IMPORT-04 以「先匯入範例 A 再失敗」為前置，斷言 phase READY、4 題、6 slot、importSummary 不變（TEST_SPEC 該案例「phase 與題目不變」的具體化） | — |
+| parser 邊界規則（同列多個表頭取最左、後備規則不足 2 列仍為單題、單題以「（1）」開頭仍為單題、前綴混用、「2.5」略過） | T010 必須實作；以 UT-PARSE-01～22 與 parser.ts 覆蓋率門檻驗證。若 T026 覆蓋率未達 95%／90%，不新增無 ID 的測試、不降門檻，依原則 II 提案在 TEST_SPEC 新增 UT-PARSE-23 起的案例並登記於 TECH_SPEC §14.1、TEST_SPEC §10，經同意後補測試 | — |
 | devRoutes、fakeGateway.getSnapshot／reset | E2E 每個 spec 前呼叫 reset（TEST_SPEC §7）；quickstart 步驟 7 | 004：UT-GW-05、IT-FLOW-01、E2E-14、15 |
 | MA-01、MA-02、MA-05、MA-09 | 手動，記錄於 `docs/manual-test.md` | — |
 
@@ -166,5 +169,5 @@ specs/002-guided-notes-import/
 
 | 例外 | 為何需要 | 為何不採用較簡單的做法 |
 | --- | --- | --- |
-| 原則 VII：`devRoutes.ts`、`index.ts` 的 gateway 組裝（GoogleAuth、`google.sheets`）、`app.ts` 掛載、`teacherRoutes` 的 import 路由、`useTeacher.importSheet`、TeacherDashboard READY 畫面，沒有 002 專屬 TEST_SPEC 案例 ID | §14.1 的 002 列沒有這些模組的 ID；原則 II 禁止自行新增 ID。改由既有 ID 覆蓋：import 路由與 hook 由 E2E-01、02 驗證；devRoutes 由 E2E 前置 reset 呼叫與 004 的 E2E-14、15、IT-FLOW-01 驗證；Google 組裝由手動 MA-01、MA-02 驗證 | 寫無 ID 的測試違反原則 VII 命名規則；Google 組裝需要真實金鑰與網路，依原則 VII 不應寫成 unit test |
+| 原則 VII：`devRoutes.ts`、`index.ts` 的 gateway 組裝（GoogleAuth、`google.sheets`）、`googleGateway.ts` 的實際連網部分（TEST_SPEC §2.3 允許排除；其餘邏輯由 UT-GW-01、03 覆蓋）、`app.ts` 掛載、`teacherRoutes` 的 import 路由、`useTeacher.importSheet`、TeacherDashboard READY 畫面，沒有 002 專屬 TEST_SPEC 案例 ID | §14.1 的 002 列沒有這些模組的 ID；原則 II 禁止自行新增 ID。改由既有 ID 覆蓋：import 路由與 hook 由 E2E-01、02 驗證；devRoutes 由 E2E 前置 reset 呼叫與 004 的 E2E-14、15、IT-FLOW-01 驗證；Google 組裝由手動 MA-01、MA-02 驗證 | 寫無 ID 的測試違反原則 VII 命名規則；Google 組裝需要真實金鑰與網路，依原則 VII 不應寫成 unit test |
 | D5：002 的 `writeCells` 只丟出 `SHEETS_ERROR` | `SheetsGateway` 介面要求 `writeCells`，但 §14.1 把寫回放在 004 | 提前實作寫回會超出 002 範圍並缺少 004 的測試（UT-GW-02、05） |

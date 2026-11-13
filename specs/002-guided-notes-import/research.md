@@ -61,7 +61,7 @@ Technical Context 沒有 NEEDS CLARIFICATION；以下記錄本子功能的設計
 
 ## R-07 前端
 
-- **Decision**：`useTeacher.importSheet(spreadsheet)` 呼叫 `POST /api/teacher/sessions/:id/import`，期間 `busy=true`；`ImportForm` 在輸入為空白或 `busy` 時 disable `import-submit`，忙碌文字「匯入中…」（UT-UI-IMPORT-01、04）；`ImportSummary` 依 `TeacherView.importSummary` 顯示固定文字與 `import-warning-{i}`（UT-UI-IMPORT-02）；`HEADER_NOT_FOUND` 時 ErrorBanner 下方顯示範本格式說明（UT-UI-IMPORT-03；內容依 spec FR-017）。
+- **Decision**：`useTeacher.importSheet(spreadsheet)` 呼叫 `POST /api/teacher/sessions/:id/import`，期間 `busy=true`；`ImportForm` 在輸入為空白或 `busy` 時 disable `import-submit`，忙碌文字「匯入中…」（UT-UI-IMPORT-01、04）；`ImportSummary` 依 `TeacherView.importSummary` 顯示固定文字與 `import-warning-{i}`（UT-UI-IMPORT-02）；錯誤由 `useTeacher.error` 經 TeacherDashboard 唯一的 ErrorBanner 顯示；`HEADER_NOT_FOUND` 時 ImportForm 只在表單下方顯示範本格式說明（UT-UI-IMPORT-03；內容依 spec FR-017），不另外渲染 ErrorBanner，避免重複（analyze M3）。
 - 摘要與題號清單來自 `teacher:state` 快照（重新整理後仍在，FR-023）。
 
 ## R-08 makeTestService 與 fixtures.ts

@@ -54,6 +54,6 @@ P --> Svc : throw AppError(HEADER_NOT_FOUND)
 note right of Svc : 不寫入資料庫、不推播；\n階段、既有題目與作答格不變
 Svc --> Http : AppError(HEADER_NOT_FOUND)
 Http --> TC : 422 { error: { code: HEADER_NOT_FOUND, message } }
-TC -> TC : busy=false
-TC -> T : ErrorBanner 顯示「找不到「題號」與「作答」表頭，\n請確認 Guided Notes 格式」並附範本格式說明
+TC -> TC : busy=false；useTeacher.error = HEADER_NOT_FOUND
+TC -> T : 管理頁唯一的 ErrorBanner（001）顯示「找不到「題號」與「作答」表頭，\n請確認 Guided Notes 格式」；ImportForm 只在下方附範本格式說明
 @enduml

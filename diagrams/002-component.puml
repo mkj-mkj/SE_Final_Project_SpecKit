@@ -7,9 +7,9 @@ actor 老師 as T
 
 package "瀏覽器（老師端）" {
   [管理頁\nTeacherDashboard\n(READY 題號清單，題組標示子題)] as TDash
-  [匯入表單\nImportForm\n(import-input、import-submit；\n空白或 busy 時 disabled，忙碌時文字「匯入中…」)] as Form
+  [匯入表單\nImportForm\n(import-input、import-submit；\n空白或 busy 時 disabled，忙碌時文字「匯入中…」；\nHEADER_NOT_FOUND 時顯示範本格式說明)] as Form
   [匯入摘要\nImportSummary\n(import-summary：「偵測到 N 題，其中 M 題組（共 K 子題）、L 單題」；\nimport-question-count、import-group-count、import-warning-{i})] as Sum
-  [錯誤橫幅\nErrorBanner（001）\n(ImportForm 引用；HEADER_NOT_FOUND 時\nImportForm 於下方附範本格式說明)] as Err
+  [錯誤橫幅\nErrorBanner（001，管理頁唯一一個）\n(顯示 useTeacher.error；ImportForm 不另顯示錯誤，\nHEADER_NOT_FOUND 時 ImportForm 只附範本格式說明)] as Err
   [useTeacher.importSheet\n(busy 狀態)] as Hook
 }
 
@@ -37,7 +37,7 @@ database "資料庫\n(sessions / questions / answer_slots / drafts)" as DB
 T --> Form : 貼上網址或 ID，按「匯入」
 TDash --> Form
 TDash --> Sum
-Form --> Err
+TDash --> Err : useTeacher.error
 Form --> Hook
 Hook --> Http : { spreadsheet }
 
@@ -63,5 +63,5 @@ Svc --> BC : publish(sessionId)
 BC --> Proj : TeacherView／TeamView
 BC ..> TDash : teacher:state（題號清單、importSummary）
 Http ..> Hook : 200 { view, summary }
-Http ..> Hook : 4xx/5xx 錯誤碼 → ImportForm 顯示 ErrorBanner
+Http ..> Hook : 4xx/5xx 錯誤碼 → 設定 useTeacher.error（管理頁 ErrorBanner 顯示）
 @enduml
