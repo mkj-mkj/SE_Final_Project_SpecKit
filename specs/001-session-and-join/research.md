@@ -4,9 +4,9 @@ Technical Context 沒有 NEEDS CLARIFICATION。以下記錄 TECH_SPEC 未寫明�
 
 ## R-01 Monorepo 與測試組態
 
-- **Decision**: 根目錄 `package.json` 以 npm workspaces 管理 `shared`、`server`、`client`、`e2e`；根目錄 `vitest.workspace.ts` 列出 shared／server／client 三個專案，`npm test` 一次跑完 UT＋IT；`npm run test:coverage` 在根目錄以 `@vitest/coverage-v8` 彙整覆蓋率，並用 `coverage.thresholds` 的 glob 鍵設定 TEST_SPEC §2.3 的分區門檻。shared 以 TypeScript 原始碼直接被 server／client 引用（`"main": "src/index.ts"`、tsconfig `paths`），開發與測試不需先 build。
+- **Decision**: 根目錄 `package.json` 以 npm workspaces 管理 `shared`、`server`、`client`、`e2e`；根目錄 `vitest.workspace.ts` 列出 shared／server／client 三個專案，`npm test` 一次跑完 UT＋IT；`npm run test:coverage` 在根目錄以 `@vitest/coverage-v8` 彙整覆蓋率，並用 `coverage.thresholds` 的 glob 鍵設定 TEST_SPEC §2.3 的分區門檻。shared 的 `package.json` 以 `exports` 條件區分：自訂條件 `source` 指向 `src/index.ts`（tsx `--conditions=source`、Vitest／Vite `resolve.conditions`、tsconfig `customConditions` 啟用），開發與測試不需先 build；`default` 指向 `dist/index.js`，供 `npm start` 執行建置結果（TECH_SPEC §3.2）。
 - **Rationale**: 單一指令產生單一覆蓋率報告，門檻才能涵蓋「全專案 ≥ 80%」；避免每個 workspace 各自計算。
-- **Alternatives**: 每個 workspace 各跑 Vitest 再合併報告（設定複雜、全專案門檻難以計算）；shared 先 build 成 JS（開發迴圈變慢）。
+- **Alternatives**: 每個 workspace 各跑 Vitest 再合併報告（設定複雜、全專案門檻難以計算）；開發時也要求 shared 先 build（開發迴圈變慢）；正式啟動也用 tsx 執行原始碼（違反 TECH_SPEC §3.2「以建置結果啟動」，且 tsx 會變成執行期相依，不採用）。
 
 ## R-02 讀取 `.env`
 

@@ -26,7 +26,9 @@
 **Primary Dependencies**:
 - 後端：Express 4、Socket.IO 4、zod、Node 內建 `node:sqlite`（`DatabaseSync`）、`dotenv`（讀 `.env`，純 JS）
 - 前端：React 18、Vite 5、React Router 6、socket.io-client
-- 開發：tsx（server watch）、concurrently（`npm run dev` 同時啟動）、ESLint（typescript-eslint）
+- 開發：tsx（只用於 `npm run dev` 的 server watch，為 devDependency）、concurrently（`npm run dev` 同時啟動）、ESLint（typescript-eslint）
+
+**Build／Start（TECH_SPEC §3.2）**：`npm run build` 依序建置 shared（`tsc` → `shared/dist`）、server（`tsc` → `server/dist`，並複製 `src/db/schema.sql` 到 `dist/db/`）、client（`vite build` → `client/dist`）；`npm start` 以 `node server/dist/index.js` 執行建置結果，由 server 提供 `client/dist` 靜態檔。shared 的 `package.json` 以 `exports` 條件區分：自訂條件 `source` → `./src/index.ts`（開發、測試、型別檢查用；tsx 以 `--conditions=source`、Vitest／Vite 以 `resolve.conditions`、tsconfig 以 `customConditions` 啟用），`default` → `./dist/index.js`（正式啟動用）。
 - 禁止：better-sqlite3 及任何含 `.node` 原生模組的套件（Windows 智慧型應用程式控制會封鎖）
 
 **Storage**: SQLite（`node:sqlite`），檔案 `DB_PATH=./data/quiz.db`；測試用 `:memory:`。本子功能建立 §5 全部資料表，只讀寫 sessions、teams、members。成員上線狀態只存記憶體。
@@ -55,14 +57,14 @@
 | IV 資訊隔離 | 學生只收 `projectTeamView(agg, teamId)`，推播到 `team:${teamId}`；`getPublicInfo` 只回人數不回暱稱；UT-PROJ-10、UT-BC-03 驗證 payload | ✅ |
 | V 動態定位 | 本子功能不涉及試算表 | N/A |
 | VI 機密管理 | `TEACHER_PASSWORD` 只在 `.env`；建立 `.env.example`（假值）、`.gitignore` 含 `.env`、`secrets/`、`data/`；E2E 密碼由啟動指令注入 | ✅ |
-| VII 測試先行 | tasks 中每個模組先寫含 TEST_SPEC ID 的測試並確認失敗；使用 FakeClock、SeqIdGen、ManualScheduler，不依賴真實時間／亂數／網路 | ✅（於 tasks 落實） |
+| VII 測試先行 | 有 TEST_SPEC ID 的模組一律先寫測試並確認失敗；使用 FakeClock、SeqIdGen、ManualScheduler，不依賴真實時間／亂數／網路。TEST_SPEC 沒有案例的組裝與 I/O 模組列為例外，理由見 Complexity Tracking | ⚠️ 有書面例外 |
 | VIII 可測設計 | `SessionService(deps)`、`AuthService(password, ids)` 注入依賴；`createApp(deps)` 可在測試中組裝；HTTP／Socket 層只做 zod 驗證與轉換 | ✅ |
 | IX 子功能並行 | 獨立目錄 `specs/001-session-and-join/`；tasks 會以 [BE]／[FE]／[QA] 分開；不改 TECH_SPEC 共用契約 | ✅ |
 | X 本機執行 | `npm run dev`／`npm start` 本機啟動；無容器、雲端或 CI 部署 | ✅ |
 | XI PlantUML 設計優先 | 圖表已更新為與 TECH_SPEC v1.3 一致並重新產生 PNG；本 plan 以圖表為藍圖；tasks 最後須有「程式碼與圖表一致性驗證」任務 | ✅ |
-| 技術約束 | 技術棧符合 §3；新增的執行期相依只有 `dotenv`（理由見 research.md R-02） | ✅ |
+| 技術約束 | 技術棧符合 §3；新增的執行期相依只有 `dotenv`（理由見 research.md R-02）；`tsx` 只作為開發相依；`npm start` 依 §3.2 執行建置結果 | ✅ |
 
-**Gate 結果**：通過，無需 Complexity Tracking。
+**Gate 結果**：通過；原則 VII 的例外已記錄於 Complexity Tracking（憲章 Governance「任何例外 MUST 有書面理由並記錄於該子功能的 plan」）。
 
 ## 設計要點（以圖表為藍圖）
 
@@ -129,14 +131,14 @@ specs/001-session-and-join/
 
 ```text
 /
-├─ package.json  tsconfig.base.json  eslint.config.js  vitest.workspace.ts
+├─ package.json  tsconfig.base.json  eslint.config.js  vitest.workspace.ts  vitest.config.ts
 ├─ .env.example  .gitignore  README.md
 ├─ shared/
-│   ├─ package.json  tsconfig.json
+│   ├─ package.json  tsconfig.json  tsconfig.build.json  vitest.config.ts
 │   ├─ src/  types.ts  errors.ts  constants.ts  validation.ts  index.ts
 │   └─ test/ validation.test.ts  errors.test.ts
 ├─ server/
-│   ├─ package.json  tsconfig.json  vitest.config.ts
+│   ├─ package.json  tsconfig.json  tsconfig.build.json  vitest.config.ts
 │   ├─ src/
 │   │   ├─ index.ts  app.ts  config.ts
 │   │   ├─ ports/    clock.ts  scheduler.ts  ids.ts  sheetsGateway.ts
@@ -154,17 +156,18 @@ specs/001-session-and-join/
 │       ├─ realtime/ broadcaster.test.ts
 │       └─ integration/ auth.it.test.ts  online.it.test.ts
 ├─ client/
-│   ├─ package.json  tsconfig.json  vite.config.ts  index.html
+│   ├─ package.json  tsconfig.json  vite.config.ts  vitest.config.ts  index.html
 │   ├─ src/
 │   │   ├─ main.tsx  App.tsx  api.ts  socket.ts  storage.ts  messages.ts
 │   │   ├─ hooks/      useTeacher.ts  usePlay.ts
 │   │   ├─ pages/      Home.tsx  TeacherLogin.tsx  TeacherDashboard.tsx  Join.tsx  Play.tsx
 │   │   └─ components/ LoginForm.tsx  SettingsForm.tsx  RoomCode.tsx  TeamList.tsx
 │   │                  PhaseBadge.tsx  ErrorBanner.tsx  JoinForm.tsx  TeamHeader.tsx
-│   └─ test/  storage.test.ts  messages.test.ts  components/*.test.tsx  pages/*.test.tsx
-└─ e2e/
-    ├─ package.json  playwright.config.ts
-    └─ tests/ identity.spec.ts   # E2E-03、E2E-18
+│   └─ test/  setup.ts  storage.test.ts  messages.test.ts  components/*.test.tsx  pages/*.test.tsx
+├─ e2e/
+│   ├─ package.json  tsconfig.json  playwright.config.ts
+│   └─ tests/ identity.spec.ts   # E2E-03、E2E-18
+└─ docs/manual-test.md          # 手動驗收紀錄（001 段落）
 ```
 
 **Structure Decision**: 採 TECH_SPEC §2 的 npm workspaces 結構。本子功能只建立上列檔案；§2 中其他檔案（`sheets/`、`export/`、`domain/ranking.ts`、`settlement.ts`、`boot/recover.ts`、`devRoutes.ts`、`format.ts`、`useServerClock.ts`、`seed.ts`、`fixtures.ts`）留給 002–004，不預先建立空殼。
@@ -176,6 +179,22 @@ specs/001-session-and-join/
 - 判錯、寫回、CSV、結果畫面 → 004
 - `index.ts` 不呼叫 `recover()`（003 才加入）；啟動時只把所有成員視為離線（online 狀態本來就只在記憶體）
 
+## 驗證範圍與後續子功能
+
+| 需求 | 001 的驗證方式 | 自動化驗證所在 |
+| --- | --- | --- |
+| SC-001、SC-004（1 秒內、40 個連線） | 推播機制由 UT-BC-01～03、IT-ONLINE-01 驗證；時間以 T089 手動計時 | 003：IT-PERF-01、IT-SYNC-01 |
+| FR-025、SC-002（重新整理 `/play` 回到原組） | 伺服器端 UT-SVC-JOIN-08；`/join` 導向 E2E-18；`/play` 重新整理於 T089 手動驗證 | 003：E2E-10 |
+| FR-031（伺服器重啟後全部離線） | 線上狀態只存記憶體（research R-09）；T089 手動重啟驗證 | 003：UT-SVC-RECOVER-03、IT-RESTART-01 |
+| FR-033、FR-035、FR-036（快照取代、連線即收狀態、Socket 憑證失效） | IT-ONLINE-01、IT-AUTH-03、E2E-03；T089 手動驗證 | 003：IT-RECON-01 |
+| FR-009（目前活動＝最新建立） | UT-SVC-CREATE-02 額外斷言 `getCurrentSession()` 回傳第二個活動 | — |
+| SC-006（房間碼字元規則） | 重抽由 UT-SVC-CREATE-02 驗證；字元規則於 T089 手動檢查 | —（2026-11-13 決定不新增 TEST_SPEC 案例，以手動驗收為準） |
+| FR-027（`?room=` 預填） | T089 手動驗證 | — |
+
 ## Complexity Tracking
 
-無憲章違反，不需填寫。
+| 例外 | 為何需要 | 為何不採用較簡單的做法 |
+| --- | --- | --- |
+| 原則 VII：`ports/` 正式實作（`systemClock`、`timerScheduler`、`cryptoIdGen`）、`config.ts`、`index.ts`、`app.ts`、`errorHandler.ts`、`http/auth.ts`、client `api.ts`、`socket.ts`、`useTeacher`、`usePlay`、無案例的元件與頁面，沒有 TEST_SPEC 專屬案例 ID | TECH_SPEC §14.1 只列出 001 的測試 ID；原則 VII 要求測試名稱含 TEST_SPEC ID，原則 II 禁止自行新增 ID。這些模組改由既有 ID 的測試覆蓋：`app.ts`／`errorHandler.ts`／`http/auth.ts`（IT-AUTH-01～02，**在實作之前**撰寫）、hooks（UT-UI-DASH、UT-UI-PLAY，**在實作之前**撰寫）；`ports/` 正式實作、`config.ts`、`index.ts`、`api.ts`、`socket.ts` 由 Phase 4 的 E2E-03、E2E-18 驗證（實作之後才執行） | 寫無 ID 的測試會違反原則 VII 的命名規則；自行新增 ID 會違反原則 II。正式實作依賴真實時間、亂數與網路，依原則 VII 也不應寫成 unit test |
+
+**決議（2026-11-13）**：曾評估新增 `UT-IDS-01`、`UT-SVC-CREATE-08`、`UT-CFG-01～02`、`UT-UI-API-01` 四個 TEST_SPEC 案例，團隊決定**不採納**。上表例外為本子功能的正式做法；FR-009 以 UT-SVC-CREATE-02 的額外斷言涵蓋，SC-006 字元規則以 T089 手動驗收涵蓋。
