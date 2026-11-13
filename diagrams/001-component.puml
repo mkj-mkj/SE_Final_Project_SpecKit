@@ -5,44 +5,46 @@ left to right direction
 
 package "瀏覽器（老師端）" {
   [老師登入頁\nTeacherLogin] as TLogin
-  [管理頁\nTeacherDashboard] as TDash
-  [老師分頁儲存\n(sessionStorage)] as TStore
+  [管理頁\nTeacherDashboard\n(btn-create-session 只在無活動時顯示；teacher-logout)] as TDash
+  [老師分頁儲存\n(sessionStorage quiz.teacher)] as TStore
 }
 
 package "瀏覽器（學生端）" {
   [加入頁\nJoin] as Join
   [作答頁\nPlay] as Play
-  [學生身分儲存\n(localStorage)] as MStore
+  [學生身分儲存\n(localStorage quiz.member)] as MStore
 }
 
 package "伺服器" {
-  [HTTP 路由\n/api/teacher、/api/public、/api/play] as Http
+  [HTTP 路由\n/api/teacher、/api/public、/api/play\n(auth.ts、errorHandler.ts)] as Http
   [身分驗證\nAuthService] as Auth
   [活動服務\nSessionService] as Svc
   [階段規則\ndomain/phase] as Phase
   [視圖投影\ndomain/projections] as Proj
   [即時推播\nBroadcaster / socket] as RT
   [資料存取\nRepo] as Repo
+  [依賴介面\nClock / Scheduler / IdGen / SheetsGateway] as Ports
 }
 
 database "資料庫\n(sessions / teams / members)" as DB
 
 TLogin --> Http : 登入（密碼）
-TDash --> Http : 建立活動／調整設定
+TDash --> Http : 取得目前活動／建立活動／調整設定
 TDash ..> RT : 即時連線（老師身分 + sessionId）
-TLogin --> TStore
-TDash --> TStore
+TLogin --> TStore : 儲存身分
+TDash --> TStore : 讀取／登出時清除
 
-Join --> Http : 查詢房間碼／加入
-Play --> Http : 取得本組狀態
+Join --> Http : 有身分時 GET /api/play/state（200→導向作答頁）\n查詢房間碼／加入
+Play --> Http : GET /api/play/state
 Play ..> RT : 即時連線（學生身分）
-Join --> MStore
+Join --> MStore : 讀取／儲存／失效時清除
 Play --> MStore
 
 Http --> Auth : 驗證老師身分
 Http --> Svc : 指令
 Svc --> Phase : 檢查允許階段
 Svc --> Repo
+Svc --> Ports
 Repo --> DB
 Svc --> RT : publish(sessionId, scope)
 RT --> Proj : 產生 TeacherView／TeamView

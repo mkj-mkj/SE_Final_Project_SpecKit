@@ -17,11 +17,15 @@ class Session {
   +id: string
   +roomCode: string
   +phase: Phase
+  +spreadsheetId: string | null
+  +sheetTitle: string | null
   +fairnessMode: FairnessMode
   +windowSec: number
   +teamCount: number
   +round: number
   +createdAt: number
+  +startedAt: number | null
+  +endedAt: number | null
 }
 class Team {
   +id: string
@@ -41,17 +45,28 @@ class Member {
 class AuthService {
   -password: string
   -teacherTokens: Set<string>
+  +constructor(password: string, ids: IdGen)
   +login(password: string): string
   +verifyTeacher(token: string | undefined): void
 }
 
+class ServiceDeps <<interface>> {
+  +repo: Repo
+  +clock: Clock
+  +scheduler: Scheduler
+  +ids: IdGen
+  +sheets: SheetsGateway
+  +broadcaster: Broadcaster
+}
+
 class SessionService {
-  +createSession(input): TeacherView
+  +constructor(deps: ServiceDeps)
+  +createSession(input: {teamCount?, fairnessMode?, windowSec?}): TeacherView
   +getCurrentSession(): TeacherView | null
   +getTeacherView(sessionId: string): TeacherView
-  +updateSettings(sessionId: string, input): TeacherView
+  +updateSettings(sessionId: string, input: {teamCount?, fairnessMode?, windowSec?}): TeacherView
   +getPublicInfo(roomCode: string): PublicSessionInfo
-  +join(roomCode: string, input: {teamId, nickname}): JoinResult
+  +join(roomCode: string, input: {teamId, nickname}): {token, memberId, teamId, sessionId}
   +resolveMember(token: string): Member & {sessionId}
   +getTeamView(memberToken: string): TeamView
   +setOnline(memberId: string, online: boolean): void
@@ -61,25 +76,46 @@ interface Broadcaster {
   +publish(sessionId: string, scope?: PublishScope): void
 }
 interface Repo
-interface Clock
+interface Clock {
+  +now(): number
+}
+interface Scheduler {
+  +schedule(key: string, at: number, fn: () => void): void
+  +cancel(key: string): void
+  +cancelAll(): void
+}
 interface IdGen {
-  +roomCode(): string
+  +id(prefix): string
   +token(): string
+  +roomCode(): string
+}
+interface SheetsGateway {
+  +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
+  +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
 }
 
 class AppError {
   +code: ErrorCode
 }
 
+note right of SessionService
+  001 只實作列出的方法；
+  scheduler 與 sheets 依 §7.9 注入，
+  由 002、003 使用。
+end note
+
 Session "1" *-- "2..20" Team : 擁有
 Team "1" *-- "0..*" Member : 擁有
 Session --> Phase
 Session --> FairnessMode
 
-SessionService --> Repo
-SessionService --> Clock
-SessionService --> IdGen
-SessionService --> Broadcaster
+SessionService --> ServiceDeps
+ServiceDeps --> Repo
+ServiceDeps --> Clock
+ServiceDeps --> Scheduler
+ServiceDeps --> IdGen
+ServiceDeps --> SheetsGateway
+ServiceDeps --> Broadcaster
 SessionService ..> Session
 SessionService ..> Team
 SessionService ..> Member

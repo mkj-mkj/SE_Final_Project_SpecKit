@@ -14,21 +14,40 @@ T -> TC : 輸入管理密碼
 TC -> Auth : login(password)
 alt 密碼正確
   Auth --> TC : teacher token
-  TC -> TC : 存於目前分頁
+  TC -> TC : 存於目前分頁（quiz.teacher）
 else 密碼錯誤
   Auth --> TC : UNAUTHORIZED
   TC -> T : 顯示「驗證失敗，請重新登入或加入」
 end
-T -> TC : 建立活動
 TC -> Auth : verifyTeacher(token)
-TC -> Svc : createSession({})
-Svc -> DB : 新增 session（SETUP、6 組、fair、3 秒）\n房間碼重複則重抽（最多 10 次）
-Svc -> BC : publish(sessionId)
-Svc --> TC : TeacherView（房間碼、組別、階段「準備中」）
+TC -> Svc : getCurrentSession()
+alt 尚無活動（404）
+  TC -> T : 顯示 btn-create-session
+  T -> TC : 建立活動
+  TC -> Svc : createSession({})
+  Svc -> DB : 新增 session（SETUP、6 組、fair、3 秒）\n房間碼重複則重抽（最多 10 次）
+  Svc -> BC : publish(sessionId)
+  Svc --> TC : TeacherView（房間碼、組別、階段「準備中」）
+else 已有活動（200）
+  Svc --> TC : TeacherView（不顯示 btn-create-session）
+end
 TC -> BC : 即時連線 {teacher token, sessionId}
 BC --> TC : teacher:state（目前完整狀態）
+opt 老師按 teacher-logout
+  TC -> TC : clearTeacher()；中斷連線；導向 /teacher/login（不呼叫伺服器）
+end
 
 == 學生加入 ==
+S -> SC : 開啟加入頁
+opt 已保存學生身分（quiz.member）
+  SC -> Svc : getTeamView(token)（GET /api/play/state）
+  alt 身分有效
+    Svc --> SC : TeamView
+    SC -> SC : 導向作答頁（不允許重複加入）
+  else 身分失效（UNAUTHORIZED）
+    SC -> SC : clearMember()；預填原房間碼
+  end
+end
 S -> SC : 輸入房間碼（不分大小寫）
 SC -> Svc : getPublicInfo(roomCode)
 alt 房間碼有效
@@ -38,7 +57,7 @@ else 不存在／格式錯誤
 end
 S -> SC : 選組、輸入暱稱
 SC -> Svc : join(roomCode, {teamId, nickname})
-Svc -> Svc : 驗證組別屬於活動、暱稱 1–20 字\n且組內不重複（不分大小寫）
+Svc -> Svc : 驗證組別屬於活動、暱稱 1–20 字且符合 NICKNAME_PATTERN\n且組內不重複（不分大小寫）
 Svc -> DB : 新增 member、產生 token
 Svc -> BC : publish(sessionId, {teacher, teamIds:[本組]})
 BC --> TC : teacher:state（出現新成員）
