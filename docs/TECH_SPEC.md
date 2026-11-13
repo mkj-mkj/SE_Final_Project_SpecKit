@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.1（2026-11-13：資料庫改用 node:sqlite、E2E 改用 Edge） |
+| 版本 | v1.2（2026-11-13：資料庫改用 node:sqlite、E2E 改用 Edge；新增 §14.1 子功能對照） |
 | 需求來源 | `docs/PRD.md`（FR-01～FR-12、E1～E5、E7） |
 | 測試規範 | `docs/TEST_SPEC.md` |
 | 讀者 | 實作 agent（主要）、測試 agent、組員 |
@@ -11,7 +11,7 @@
 
 ## 0. 給實作 agent 的規則（必讀）
 
-1. 依 §14 的里程碑順序實作；每個里程碑完成時，該里程碑列出的 unit test 必須全部通過才能進下一個。
+1. 依 §14.1 的子功能順序（001 → 004）實作；每個子功能只實作該列的範圍，該列的測試必須全部通過才能合併。§14 的里程碑表說明模組的層次關係，僅供參考。
 2. 本文件中的**型別、函式簽名、API 路徑、事件名稱、錯誤碼、`data-testid`** 是介面契約，測試 agent 依此撰寫測試，不得自行改名。若必須改，先改本文件並註明原因。
 3. 所有業務邏輯放在 `server/src/domain`、`server/src/sheets`、`server/src/services`，以**純函式或注入依賴**撰寫；HTTP 與 Socket 層只做轉換，不寫業務規則。
 4. 時間一律透過 `Clock` 取得，計時一律透過 `Scheduler`，ID 一律透過 `IdGen`；禁止在 domain／service 中直接呼叫 `Date.now()`、`setTimeout`、`Math.random()`。
@@ -1125,7 +1125,7 @@ SV --> T : CSV（UTF-8 BOM）
 
 ---
 
-## 14. 實作里程碑（agent 依序執行）
+## 14. 實作里程碑（模組層次，僅供參考；實作順序見 §14.1）
 
 每個里程碑的完成定義（DoD）：程式完成、該里程碑的 unit test（TEST_SPEC 對應 ID）全部通過、`npm run lint` 無錯、README 更新。
 
@@ -1139,3 +1139,20 @@ SV --> T : CSV（UTF-8 BOM）
 | M6 | HTTP + Socket | routes、errorHandler、broadcaster、socket、recover、devRoutes | UT-BC、UT-SVC-RECOVER、IT-*（整合測試） |
 | M7 | 前端 | 路由、hooks、元件、樣式 | UT-UI-* |
 | M8 | E2E 與文件 | Playwright、README、`docs/manual-test.md` 範本、PlantUML 圖 | E2E-*、TEST_SPEC §8 驗收 |
+
+### 14.1 子功能對照（SpecKit 依此拆分，實作與測試以本表為準）
+
+各子功能依序開發，後者建立在前者之上。「範圍」未列出的函式不要先做；某函式在本子功能只做一部分時，以括號說明。測試 ID 見 `docs/TEST_SPEC.md`。
+
+| 子功能 | 後端範圍 [BE] | 前端範圍 [FE] | 必須通過的測試 |
+| --- | --- | --- | --- |
+| 001-session-and-join | 專案骨架（§2、§3：workspaces、tsconfig、ESLint、Vitest 與覆蓋率門檻、`.env.example`、`.gitignore`）；`shared/` 全部（§3.3、§4、§11 的 types、errors、constants、validation）；`ports/*`（§7.1）；`db/schema.sql`（§5 全部資料表）、`db/db.ts`（openDb、withTransaction）、repo（sessions、teams、members）；`domain/phase.ts`（§6 全部）；`domain/projections.ts`（只做 session、teams、members；questions、cells、drafts、mySubmissions 回傳空陣列或空物件，results 為 null，importSummary 為 null）；`authService`（§7.10）；`sessionService` 的 createSession、getCurrentSession、getTeacherView、updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline；`http/auth.ts`、`errorHandler.ts`；路由 `POST /api/teacher/login`、`POST /api/teacher/sessions`、`GET /api/teacher/sessions/current`、`GET /api/teacher/sessions/:id`、`PATCH /api/teacher/sessions/:id/settings`、§8.2 全部、`GET /api/play/state`；`realtime/broadcaster.ts`、`realtime/socket.ts`（§7.11、§9）；`app.ts`、`index.ts`、`config.ts`；測試替身 fakeClock、manualScheduler、seqIdGen、recordingBroadcaster、fakeIo、inMemorySheets、makeTestService | `main.tsx`、`App.tsx`（§10.1 全部路由）、`api.ts`、`socket.ts`、`storage.ts`（§10.2）、`messages.ts`（§10.6）；useTeacher 的 view、error、busy、createSession、updateSettings；usePlay 的 view、me、error；頁面 Home、TeacherLogin、Join、TeacherDashboard（建立活動、RoomCode、SettingsForm、TeamList、PhaseBadge、ErrorBanner）、Play（TeamHeader 與等待畫面）；元件 LoginForm、SettingsForm、RoomCode、TeamList、PhaseBadge、ErrorBanner、JoinForm、TeamHeader | UT-VAL、UT-ERR、UT-PHASE、UT-REPO-01、UT-REPO-07、UT-AUTH、UT-SVC-CREATE、UT-SVC-JOIN、UT-PROJ-10、UT-BC、UT-UI-STORE、UT-UI-MSG、UT-UI-PHASE、UT-UI-LOGIN、UT-UI-SET、UT-UI-JOIN、UT-UI-PLAY-01～02、IT-AUTH-01～03、IT-ONLINE-01、E2E-03 |
+| 002-guided-notes-import | `sheets/a1.ts`（§7.2）；`sheets/parser.ts`（§7.3，含 summarize）；`fakeGateway.ts`（fetchSnapshot、getSnapshot、reset）；`googleGateway.ts`（createGoogleGateway、fetchSnapshot 與錯誤對照）；repo（questions、answer_slots）；`sessionService.importSheet`；projections 補上 questionInfo、TeacherView 的 questions 與 importSummary、TeamView 的 questions；路由 `POST /api/teacher/sessions/:id/import`、`devRoutes`（§8.4）；`config.ts` 依 `SHEETS_MODE` 組裝 gateway；測試替身 fixtures.ts，makeTestService 預設載入兩份 fixture | ImportForm、ImportSummary；useTeacher.importSheet；TeacherDashboard 的 READY 畫面（題號清單，題組標示子題） | UT-A1、UT-PARSE、UT-GW-01、UT-GW-03、UT-GW-04、UT-SVC-IMPORT、UT-PROJ-01、UT-UI-IMPORT、E2E-01、E2E-02；手動 MA-01、MA-02 |
+| 003-live-quiz | `domain/ranking.ts`（§7.6）、`domain/settlement.ts`（§7.7）；projections 其餘部分（TeacherView 的 cells、題目 state、windowEndsAt、winnerTeamId、teams.score；TeamView 的 drafts、mySubmissions；buildResults）；repo（drafts、submissions、seq）；`sessionService` 的 start、end、reset、updateDraft、submit、withdraw、settleWindow、recover（§7.9 演算法）；`boot/recover.ts`（§7.12）；路由 `POST /api/teacher/sessions/:id/start`、`/end`、`/reset`、`PUT /api/play/drafts/:questionId`、`POST /api/play/submissions`、`POST /api/play/submissions/:id/withdraw`；推播範圍依 §9.3；測試替身 seed.ts | `format.ts`、`useServerClock`；useTeacher 的 start、end、reset；usePlay 的 setDraft、submit、withdraw；ControlBar、StatusGrid（§10.4 StatusCell 規則）、AnswerCard（§10.4 狀態表中 rejected 以外的全部狀態）；Play 的搶答畫面 | UT-RANK、UT-SETTLE、UT-PROJ-02～08、UT-REPO-02～06、UT-SVC-PHASE、UT-SVC-DRAFT、UT-SVC-SUB、UT-SVC-FAIR、UT-SVC-WD、UT-SVC-RECOVER、UT-UI-FMT、UT-UI-CLOCK、UT-UI-CTRL、UT-UI-GRID、UT-UI-CARD-01～05、IT-PHASE-01、IT-VAL-01、IT-VIS-01、IT-SYNC-01、IT-RT-01、IT-CONC-01、IT-RECON-01～02、IT-RESTART-01、IT-PERF-01、E2E-04～11 |
+| 004-results-export | `sheets/exporter.ts`（§7.4）；`googleGateway.writeCells`、`fakeGateway.writeCells`；`export/csv.ts`（§7.5）；`projections.buildCsvRows`；`sessionService` 的 rejectWinner、exportToSheet、restoreSheet、exportCsv；路由 `POST /api/teacher/sessions/:id/questions/:qid/reject-winner`、`/export`、`/restore`、`GET /export.csv` | useTeacher 的 rejectWinner、exportToSheet、restoreSheet、downloadCsv；ResultsTable、ExportPanel、StudentResults；AnswerCard 的 rejected 狀態；Play 的 ENDED 畫面 | UT-EXP、UT-CSV、UT-GW-02、UT-GW-05、UT-PROJ-09、UT-SVC-REJ、UT-SVC-EXPORT、UT-UI-RES、UT-UI-EXP、UT-UI-CARD-06、UT-UI-PLAY-03、IT-FLOW-01、IT-CSV-01、IT-VIS-02、E2E-12～17；手動 MA-03～08；全部測試回歸與 TEST_SPEC §2.3 覆蓋率門檻 |
+
+補充：
+- 某測試需要後續子功能才有的階段（例如 001 的 UT-SVC-JOIN-07、UT-SVC-CREATE-06 需要 RUNNING），在測試中直接用 repo 設定 session.phase，不要提前實作 start。
+- `e2e/playwright.config.ts`（`channel: 'msedge'`、以 `SHEETS_MODE=fake` 自動啟動 server）屬於 001 的 [QA] 任務，由驗證者建立。
+- 001 的 makeTestService 預設 `snapshots` 為空物件；002 起預設載入 `fixture-template-a`、`fixture-template-b`。
+- 每個子功能完成時必須通過：本列測試、前面所有子功能的測試、`npm run lint`。
