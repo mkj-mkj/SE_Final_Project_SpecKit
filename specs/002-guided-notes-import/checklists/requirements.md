@@ -33,5 +33,4 @@
 
 - spec.md 本文不指定框架或工具；設計圖（憲章原則 XI）依 `docs/TECH_SPEC.md` 標示模組與介面名稱，屬於 plan 的藍圖，不算 spec 的實作細節。
 - 錯誤訊息逐字採用 `docs/TECH_SPEC.md` §11；辨識規則與 PRD §9、TECH_SPEC §7.3 一致；驗收情境對應 TEST_SPEC UT-PARSE-01～20、UT-SVC-IMPORT-01～06、UT-UI-IMPORT-01～03、E2E-01～02。
-- 待 plan 階段確認：摘要文字以使用者指定的「偵測到 N 題，其中 M 題組（共 K 子題）、L 單題」為準，TECH_SPEC §10.5 線框寫法為「偵測到 4 題：2 題組（共 4 子題）、2 單題」，兩者略有差異（見 spec Assumptions）。
-- SC-005（2 秒／10 秒）屬於合理預設值，PRD 沒有規定。
+- 摘要文字、題號 0、匯入完成時間（SC-005）、無確認按鈕等 PRD 未規定事項，已於 2026-11-13 clarify 由使用者決定（見 spec Clarifications）。

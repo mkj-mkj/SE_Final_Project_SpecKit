@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.2（2026-11-13：同步 PRD v1.1／TECH_SPEC v1.3——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制、組別人數不設上限） |
+| 版本 | v1.3（2026-11-13：同步 PRD v1.2／TECH_SPEC v1.4——匯入摘要文字、匯入進行中按鈕停用、題號 0 與前面補零、fake 模式匯入 < 2 秒、README 列出範例 ID；前版 v1.2：同步 PRD v1.1／TECH_SPEC v1.3——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制、組別人數不設上限） |
 | 依據 | `docs/PRD.md`、`docs/TECH_SPEC.md`（介面契約） |
 | 讀者 | 測試 agent（主要）、實作 agent、助教 |
 
@@ -226,6 +226,8 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-PARSE-18 | 表頭含空白 `' 題號 '`、`'作答 '` | 正常辨識 |
 | UT-PARSE-19 | 調換兩題在表中的順序（第 2 題在第 1 題上方） | 回傳依題號升冪 |
 | UT-PARSE-20 | 只水平合併、不跨列的題號格（rowspan=1） | 視為單題 |
+| UT-PARSE-21 | 範例 B 的 B5 由「1」改為「0」 | 6 題（題號 0、2～6）；含 1 個 `NON_CONSECUTIVE_NUMBERS` 警告；第 0 題作答格為 G5 |
+| UT-PARSE-22 | 範例 B 的題號改為 `'01'`、`'002'`、`'03.0'`（其餘不變） | 解析為 1、2、3；結果與 UT-PARSE-02 相同 |
 
 **UT-EXP（`exporter.ts`，FR-06）**
 
@@ -498,8 +500,9 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-UI-SET-01 | SettingsForm | 選純速度 | 隱藏 `settings-window-sec` |
 | UT-UI-SET-02 | SettingsForm | 輸入組數 25 | 儲存按鈕 disabled 或顯示錯誤 |
 | UT-UI-IMPORT-01 | ImportForm | 空白輸入 | 匯入按鈕 disabled |
-| UT-UI-IMPORT-02 | ImportSummary | 範例 A summary | `import-question-count` 顯示 4、`import-group-count` 顯示 2 |
+| UT-UI-IMPORT-02 | ImportSummary | 範例 A summary | （v1.3 修改：加驗摘要文字）`import-question-count` 顯示 4、`import-group-count` 顯示 2；`import-summary` 含「偵測到 4 題，其中 2 題組（共 4 子題）、2 單題」 |
 | UT-UI-IMPORT-03 | ImportForm | api 回 HEADER_NOT_FOUND | 顯示表頭格式說明 |
+| UT-UI-IMPORT-04 | ImportForm | `importSheet` 尚未完成（pending） | `import-submit` disabled 且文字為「匯入中…」；再點擊不會再呼叫 api；完成後恢復可按 |
 | UT-UI-CTRL-01 | ControlBar | 各階段 | READY 只有 btn-start 可用；RUNNING 只有 btn-end；ENDED 只有 btn-reset |
 | UT-UI-GRID-01 | StatusGrid | 5 種格子狀態 | 分別顯示 `—`、`#2`、`★ 得主`、`已撤回`、`✗ 判錯` |
 | UT-UI-GRID-02 | StatusGrid | 題目 state window | `question-state-n` 顯示「判定中」與倒數 |
@@ -562,7 +565,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 
 | ID | 需求 | 步驟 | 期望 |
 | --- | --- | --- | --- |
-| E2E-01 | FR-01 | 老師登入 → 建立活動 → 匯入 `fixture-template-a` | `import-question-count`=4、`import-group-count`=2 |
+| E2E-01 | FR-01 | 老師登入 → 建立活動 → 匯入 `fixture-template-a` | （v1.3 修改：加驗匯入時間）`import-question-count`=4、`import-group-count`=2；按下 `import-submit` 到 `import-summary` 出現 < 2 秒 |
 | E2E-02 | FR-01 | 重新匯入 `fixture-template-b` | 顯示 6 題、0 題組 |
 | E2E-03 | 身分 | 4 個學生：第 1 組 2 人、第 2、3 組各 1 人 | 老師 `team-member-count-1`=2、`-2`=1、`-3`=1 |
 | E2E-04 | FR-07 | 開始前查看學生頁 | 所有 `answer-input-*` disabled；直接以 `page.request` 呼叫送出 API → 409 |
@@ -607,6 +610,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | MA-06 | 多分頁 Demo | 老師 + 3 組（含 1 組 2 人）四分割畫面完成一輪，畫面同步 |
 | MA-07 | 秘密資訊 | `git log -p` 搜尋 `private_key`、`TEACHER_PASSWORD=` 實值 → 無結果 |
 | MA-08 | 文件一致性 | spec、PlantUML 圖、README 功能清單、Demo 影片內容彼此一致（逐項打勾） |
+| MA-09 | 範例 ID 說明 | README 列出 `fixture-template-a`、`fixture-template-b`；fake 模式下依 README 輸入可匯入；匯入畫面不顯示模式提示 |
 
 ### 8.3 缺陷嚴重度
 
@@ -667,7 +671,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 
 | 需求 | Unit test | Integration | E2E／手動 |
 | --- | --- | --- | --- |
-| FR-01 匯入、辨識題號 | UT-A1-05～07、UT-PARSE-01～20、UT-SVC-IMPORT-01～06、UT-UI-IMPORT-01～03 | IT-FLOW-01 | E2E-01、E2E-02、MA-02 |
+| FR-01 匯入、辨識題號 | UT-A1-05～07、UT-PARSE-01～22、UT-SVC-IMPORT-01～06、UT-UI-IMPORT-01～04 | IT-FLOW-01 | E2E-01、E2E-02、MA-02、MA-09 |
 | FR-02 只以題號表示 | UT-PROJ-01、UT-PARSE-01（結果不含題目文字） | IT-FLOW-01 | E2E-01 |
 | FR-03 開始／結束 | UT-PHASE-01～03、UT-SVC-PHASE-01～05、UT-UI-CTRL-01 | IT-SYNC-01 | E2E-05、E2E-12、E2E-17 |
 | FR-04 老師即時狀態 | UT-PROJ-02、03、10、UT-UI-GRID-01～02、UT-BC-01 | IT-RT-01、IT-PERF-01 | E2E-07 |
