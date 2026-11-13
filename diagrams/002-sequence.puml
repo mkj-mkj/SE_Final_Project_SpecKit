@@ -1,7 +1,7 @@
 @startuml 002-sequence
-title 002 匯入 Guided Notes — 時序圖
+title 002 匯入 Guided Notes — 時序圖（依 TECH_SPEC v1.6）
 actor 老師 as T
-participant "老師端\n(ImportForm / ImportSummary)" as TC
+participant "老師端\n(ImportForm / useTeacher)" as TC
 participant "HTTP 路由" as Http
 participant "SessionService" as Svc
 participant "a1\n(parseSpreadsheetInput)" as A1
@@ -12,34 +12,38 @@ participant "Broadcaster" as BC
 
 == 老師匯入成功 ==
 T -> TC : 貼上網址或 ID（例：fixture-template-a），按「匯入」
+TC -> TC : busy=true：import-submit disabled，文字「匯入中…」
 TC -> Http : POST /api/teacher/sessions/:id/import { spreadsheet }
 Http -> Svc : importSheet(sessionId, input)
-Svc -> Svc : 檢查階段 ∈ {SETUP, READY}\n否則 INVALID_PHASE
+Svc -> Svc : assertPhase(phase, 'import')：∈ {SETUP, READY}\n否則 INVALID_PHASE
 Svc -> A1 : parseSpreadsheetInput(input)
-A1 --> Svc : spreadsheetId
+A1 --> Svc : spreadsheetId（無效 → INVALID_SPREADSHEET_URL，不呼叫 gateway）
 Svc -> GW : fetchSnapshot(spreadsheetId)
+note right of GW : 示範模式：fixture-template-a → template-a.snapshot.json
 GW --> Svc : SheetSnapshot（各工作表 values、merges）
 Svc -> P : parseGuidedNotes(snapshot)
 P -> P : 1. 依工作表順序找「題號」「作答」表頭列
-P -> P : 2. 掃描題號欄整數列 → 題目起點
-P -> P : 3. 題號格縱向合併 n>1 → 題組；\n   否則後備規則（（1）（2）…）或單題
-P -> P : 4. 取前綴（n）/(n) 與 originalValue；\n   子題編號不符 → SUBNO_MISMATCH 並重編
-P -> P : 5. 檢查無題目／題號重複；\n   不連續 → NON_CONSECUTIVE_NUMBERS；依題號排序
+P -> P : 2–3. 掃描題號欄整數列（含 1.0、01、前後空白）→ 題目起點
+P -> P : 4–5. 題號格縱向合併 n>1 → 題組；\n   否則後備規則（（1）（2）…）或單題
+P -> P : 6–8. 取前綴（n）/(n) 與 originalValue；\n   子題編號不符 → SUBNO_MISMATCH 並重編
+P -> P : 9–10. 檢查無題目／題號重複；\n   不連續（含 0）→ NON_CONSECUTIVE_NUMBERS；依題號排序
 P --> Svc : ParseResult
 Svc -> Svc : summarize(result) → ImportSummary
-Svc -> DB : 交易：刪除舊 questions／answer_slots／drafts\n新增 Question、AnswerSlot（位置、前綴、原始內容）\n更新 session（spreadsheetId、sheetTitle、importSummary、phase=READY）
+Svc -> DB : 交易：\n① 重新讀 session 並 assertPhase（讀取期間若已開始搶答 → INVALID_PHASE）\n② 刪除舊 questions（answer_slots、drafts 連帶刪除）\n③ 新增 Question、AnswerSlot（位置、前綴、原始內容）\n④ 更新 session（spreadsheetId、sheetTitle、import_summary、phase=READY）
 Svc -> BC : publish(sessionId)
 BC --> TC : teacher:state（題號清單、importSummary）
 BC --> BC : team:state 給各組（只含題號與子題標籤）
 Svc --> Http : { view, summary }
 Http --> TC : 200 { view, summary }
+TC -> TC : busy=false
 TC -> T : 顯示「偵測到 4 題，其中 2 題組（共 4 子題）、2 單題」\n與題號清單、警告；階段「等待開始」
 
 == 匯入失敗（找不到表頭） ==
 T -> TC : 貼上不含「題號／作答」表頭的試算表，按「匯入」
+TC -> TC : busy=true
 TC -> Http : POST /api/teacher/sessions/:id/import { spreadsheet }
 Http -> Svc : importSheet(sessionId, input)
-Svc -> Svc : 檢查階段 ∈ {SETUP, READY}
+Svc -> Svc : assertPhase(phase, 'import')
 Svc -> A1 : parseSpreadsheetInput(input)
 A1 --> Svc : spreadsheetId
 Svc -> GW : fetchSnapshot(spreadsheetId)
@@ -49,6 +53,7 @@ P -> P : 所有工作表都找不到同列「題號」「作答」
 P --> Svc : throw AppError(HEADER_NOT_FOUND)
 note right of Svc : 不寫入資料庫、不推播；\n階段、既有題目與作答格不變
 Svc --> Http : AppError(HEADER_NOT_FOUND)
-Http --> TC : 422 { code: HEADER_NOT_FOUND, message }
-TC -> T : 顯示「找不到「題號」與「作答」表頭，\n請確認 Guided Notes 格式」並附範本格式說明
+Http --> TC : 422 { error: { code: HEADER_NOT_FOUND, message } }
+TC -> TC : busy=false
+TC -> T : ErrorBanner 顯示「找不到「題號」與「作答」表頭，\n請確認 Guided Notes 格式」並附範本格式說明
 @enduml

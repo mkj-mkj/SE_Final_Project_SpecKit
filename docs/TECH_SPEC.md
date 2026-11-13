@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.4（2026-11-13：同步 PRD v1.2——匯入摘要文字固定格式、匯入進行中按鈕停用；前版 v1.3：同步 PRD v1.1——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制） |
+| 版本 | v1.6（2026-11-13：§7.8 SessionAggregate 新增 importSummary，供 projectTeacherView 輸出匯入摘要（specs/002 plan D9）；v1.5：fakeGateway 讀檔規則改為去掉 `fixture-` 前綴，對應 fixtures/sheets 實際檔名（specs/002 plan D1）；前版 v1.4：同步 PRD v1.2——匯入摘要文字固定格式、匯入進行中按鈕停用；v1.3：同步 PRD v1.1——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制） |
 | 需求來源 | `docs/PRD.md`（FR-01～FR-12、E1～E5、E7） |
 | 測試規範 | `docs/TEST_SPEC.md` |
 | 讀者 | 實作 agent（主要）、測試 agent、組員 |
@@ -499,7 +499,7 @@ export function buildRestoreWrites(slots: AnswerSlot[]): CellWrite[]; // value =
 
 `fakeGateway.ts`（`SHEETS_MODE=fake`）：
 
-- `fetchSnapshot(id)` 讀取 `${FAKE_SHEETS_DIR}/${id}.snapshot.json`（id 須符合 `/^[A-Za-z0-9_-]+$/`，否則 `SHEETS_NOT_FOUND`），之後以記憶體中的副本為準。
+- `fetchSnapshot(id)`：id 必須以 `fixture-` 開頭且去掉前綴後的名稱符合 `/^[A-Za-z0-9_-]+$/`，讀取 `${FAKE_SHEETS_DIR}/${名稱}.snapshot.json`（例：`fixture-template-a` → `template-a.snapshot.json`）；不符合或檔案不存在 → `SHEETS_NOT_FOUND`。之後以記憶體中的副本為準。
 - `writeCells` 修改記憶體副本，並寫到 `data/fake-sheets/${id}.json` 方便檢查。
 - 提供 `getSnapshot(id)` 給 `devRoutes`（§8.4）。
 
@@ -550,6 +550,7 @@ export function nextOrderKey(subs: Submission[]): number;   // max(orderKey)+1�
 export interface SessionAggregate {
   session: Session; questions: Question[]; slots: AnswerSlot[]; teams: Team[];
   members: Member[]; drafts: Draft[]; submissions: Submission[]; onlineMemberIds: Set<string>;
+  importSummary: ImportSummary | null;   // 讀自 sessions.import_summary（JSON）；未匯入為 null
 }
 export function questionInfo(q: Question, slots: AnswerSlot[]): QuestionInfo;
 export function projectTeacherView(agg: SessionAggregate, now: number): TeacherView;

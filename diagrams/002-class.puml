@@ -1,5 +1,5 @@
 @startuml 002-class
-title 002 匯入 Guided Notes — 類別圖
+title 002 匯入 Guided Notes — 類別圖（依 TECH_SPEC v1.6）
 hide empty members
 
 package "試算表快照" {
@@ -112,6 +112,8 @@ package "函式模組" {
   class a1 <<module>> {
     +colToLetters(col: number): string
     +toA1(row: number, col: number): string
+    +quoteSheet(title: string): string
+    +rangeA1(sheetTitle: string, a1: string): string
     +parseSpreadsheetInput(input: string): string
   }
   class projections <<module>> {
@@ -123,15 +125,49 @@ interface SheetsGateway {
   +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
   +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
 }
-class GoogleSheetsGateway <<createGoogleGateway(client)>> {
+class GoogleSheetsGateway <<createGoogleGateway(client: sheets_v4.Sheets)>> {
   +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
   +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
 }
-class FakeSheetsGateway <<fakeGateway>> {
+note bottom of GoogleSheetsGateway
+  錯誤對照：403 → SHEETS_PERMISSION_DENIED
+  404 → SHEETS_NOT_FOUND；其他 → SHEETS_ERROR
+  002：writeCells 丟出 SHEETS_ERROR（004 實作）
+end note
+class FakeSheetsGateway <<createFakeGateway(dir)>> {
   +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
   +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
   +getSnapshot(spreadsheetId: string): SheetSnapshot
-  +reset(): void
+  +reset(spreadsheetId: string): void
+}
+note bottom of FakeSheetsGateway
+  id 必須為「fixture-{名稱}」，讀 {dir}/{名稱}.snapshot.json
+  不符合或檔案不存在 → SHEETS_NOT_FOUND
+  002：writeCells 丟出 SHEETS_ERROR（004 實作）
+end note
+
+class devRoutes <<module>> {
+  +devRoutes(fake: FakeSheetsGateway): Router
+  GET /api/dev/fake-sheets/:spreadsheetId
+  POST /api/dev/fake-sheets/:spreadsheetId/reset
+}
+
+class SessionAggregate {
+  +session: Session
+  +questions: Question[]
+  +slots: AnswerSlot[]
+  +importSummary: ImportSummary | null
+  ...（teams、members、drafts、submissions、onlineMemberIds）
+}
+
+class Repo {
+  +getImportSummary(sessionId: string): ImportSummary | null
+  +setImportSummary(sessionId: string, summary: ImportSummary): void
+  +deleteQuestionsBySession(sessionId: string): void
+  +insertQuestion(q: Question): void
+  +insertSlot(s: AnswerSlot): void
+  +listQuestions(sessionId: string): Question[]
+  +listSlotsBySession(sessionId: string): AnswerSlot[]
 }
 
 class SessionService {
@@ -151,6 +187,8 @@ Question "1" *-- "1..*" AnswerSlot
 ParsedQuestion ..> Question : 匯入時轉為
 ParsedSlot ..> AnswerSlot : 匯入時轉為
 projections ..> QuestionInfo : 產生
+projections ..> SessionAggregate : 讀取（importSummary → TeacherView）
+SessionAggregate o-- ImportSummary
 
 SheetsGateway <|.. GoogleSheetsGateway
 SheetsGateway <|.. FakeSheetsGateway
@@ -162,6 +200,9 @@ parser ..> ParseResult : 產生
 parser ..> ImportSummary : 產生
 parser ..> a1 : toA1
 
+GoogleSheetsGateway ..> a1 : quoteSheet
+devRoutes --> FakeSheetsGateway
+SessionService --> Repo : 注入
 SessionService --> SheetsGateway : 注入
 SessionService ..> a1 : parseSpreadsheetInput
 SessionService ..> parser
