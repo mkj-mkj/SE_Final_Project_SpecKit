@@ -71,7 +71,7 @@
 | 管理頁 TeacherDashboard | `client/src/pages/TeacherDashboard.tsx` | READY 畫面：ImportForm（SETUP／READY）、ImportSummary、題號清單 |
 | 匯入表單 ImportForm | `client/src/components/ImportForm.tsx` | 全部（含 busy「匯入中…」） |
 | 匯入摘要 ImportSummary | `client/src/components/ImportSummary.tsx` | 全部（固定文字、警告） |
-| 錯誤橫幅 ErrorBanner | `client/src/components/ErrorBanner.tsx`（001） | 補 HEADER_NOT_FOUND 範本格式說明 |
+| 錯誤橫幅 ErrorBanner | `client/src/components/ErrorBanner.tsx`（001） | 不修改；由 ImportForm 引用，HEADER_NOT_FOUND 時 ImportForm 在其下方加顯示範本格式說明（UT-UI-IMPORT-03） |
 | useTeacher.importSheet | `client/src/hooks/useTeacher.ts`（001） | 新增 `importSheet` |
 | 啟動與設定 | `server/src/index.ts`、`server/src/config.ts`（001） | 依 `sheetsMode` 建 googleGateway（GoogleAuth＋`google.sheets`）或 fakeGateway；fake 時傳入 `fakeSheets` 讓 app 掛 devRoutes |
 | HTTP 路由 | `server/src/http/teacherRoutes.ts`（001） | 新增 import 路由 |
@@ -139,7 +139,7 @@ specs/002-guided-notes-import/
 │       └─ services/ session.import.test.ts
 ├─ client/
 │   ├─ src/components/ ImportForm.tsx  ImportSummary.tsx                    # 新增
-│   ├─ src/components/ ErrorBanner.tsx  src/hooks/useTeacher.ts  src/pages/TeacherDashboard.tsx  # 修改
+│   ├─ src/api.ts  src/hooks/useTeacher.ts  src/pages/TeacherDashboard.tsx  # 修改
 │   └─ test/components/ ImportForm.test.tsx  ImportSummary.test.tsx
 └─ e2e/tests/ import.spec.ts         # E2E-01、E2E-02
 ```

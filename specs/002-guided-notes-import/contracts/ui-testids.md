@@ -16,7 +16,7 @@ useTeacher(): { …001 欄位…; busy: boolean; importSheet(spreadsheet: string
 | --- | --- | --- |
 | `ImportForm` | 貼上網址並匯入；輸入為空白或 `useTeacher.busy` 為 true 時 `import-submit` disabled；匯入進行中按鈕文字為「匯入中…」 | `import-input`、`import-submit` |
 | `ImportSummary` | `import-summary` 文字固定為「偵測到 {questionCount} 題，其中 {groupCount} 題組（共 {subQuestionCount} 子題）、{singleCount} 單題」，下方依序列出警告與題號清單 | `import-summary`、`import-question-count`、`import-group-count`、`import-warning-{i}` |
-| `ErrorBanner`（001） | 顯示 `messages.ts` 對照訊息；`HEADER_NOT_FOUND` 時下方附範本格式說明 | `error-banner` |
+| `ErrorBanner`（001，不修改） | ImportForm 以它顯示匯入錯誤；`HEADER_NOT_FOUND` 時 ImportForm 在其下方加顯示範本格式說明 | `error-banner` |
 
 ## TeacherDashboard（READY 畫面）
 
