@@ -1,0 +1,168 @@
+{
+  "spreadsheetId": "fixture-template-a",
+  "sheets": [
+    {
+      "sheetId": 0,
+      "title": "學習單",
+      "values": [
+        [],
+        [
+          "",
+          "計算機概論基礎 學習單"
+        ],
+        [],
+        [
+          "",
+          "題號",
+          "題目",
+          "",
+          "",
+          "",
+          "作答"
+        ],
+        [
+          "",
+          "1",
+          "根據文章第一段，小明升級的電腦「大腦」硬體，其英文簡稱是什麼？",
+          "",
+          "",
+          "",
+          "（1）"
+        ],
+        [
+          "",
+          "",
+          "而他安裝的 Windows 負責管理電腦的軟硬體資源，這種系統軟體統稱為什麼？",
+          "",
+          "",
+          "",
+          "（2）"
+        ],
+        [],
+        [
+          "",
+          "2",
+          "為了處理角色移動，小明設計了步驟明確的邏輯，這在程式設計中稱為什麼？",
+          "",
+          "",
+          "",
+          "（1）"
+        ],
+        [
+          "",
+          "",
+          "而他用來實作「上一步／復原」功能，採用了「後進先出」機制的資料結構，中文稱為什麼？",
+          "",
+          "",
+          "",
+          "（2）"
+        ],
+        [],
+        [
+          "",
+          "3",
+          "無論小明寫的高階語言多麼複雜，最終都會被轉換成由數字 1 和哪一個數字構成的二進位訊號？"
+        ],
+        [],
+        [
+          "",
+          "4",
+          "專案最後的連線失敗，是因為小明的筆電沒有成功取得一組在網路世界中用來辨識身分的獨一無二之編碼，這個號碼被稱為什麼位址？"
+        ]
+      ],
+      "merges": [
+        {
+          "sheetId": 0,
+          "startRowIndex": 1,
+          "endRowIndex": 2,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 3,
+          "endRowIndex": 4,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 3,
+          "endRowIndex": 4,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 4,
+          "endRowIndex": 6,
+          "startColumnIndex": 1,
+          "endColumnIndex": 2
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 4,
+          "endRowIndex": 5,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 5,
+          "endRowIndex": 6,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 7,
+          "endRowIndex": 9,
+          "startColumnIndex": 1,
+          "endColumnIndex": 2
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 7,
+          "endRowIndex": 8,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 8,
+          "endRowIndex": 9,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 10,
+          "endRowIndex": 11,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 10,
+          "endRowIndex": 11,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 12,
+          "endRowIndex": 13,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 0,
+          "startRowIndex": 12,
+          "endRowIndex": 13,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        }
+      ]
+    }
+  ]
+}

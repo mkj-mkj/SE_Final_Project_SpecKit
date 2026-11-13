@@ -1,0 +1,9 @@
+﻿node_modules/
+dist/
+coverage/
+data/
+secrets/
+.env
+plantuml.jar
+.specify/feature.json
+.claude/settings.local.json

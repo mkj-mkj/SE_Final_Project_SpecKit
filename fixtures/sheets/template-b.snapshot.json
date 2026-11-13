@@ -1,0 +1,210 @@
+{
+  "spreadsheetId": "fixture-template-b",
+  "sheets": [
+    {
+      "sheetId": 1000,
+      "title": "學習單",
+      "values": [
+        [],
+        [
+          "",
+          "計算機概論基礎 學習單"
+        ],
+        [],
+        [
+          "",
+          "題號",
+          "題目",
+          "",
+          "",
+          "",
+          "作答"
+        ],
+        [
+          "",
+          "1",
+          "電腦系統中負責執行程式指令、處理資料的核心硬體元件，通常被稱為電腦的大腦，它的英文縮寫是什麼？"
+        ],
+        [],
+        [
+          "",
+          "2",
+          "電腦底層處理的所有資料與指令，最終都會轉換為由數字 1 與哪一個數字所組成的二進位 (Binary) 系統？"
+        ],
+        [],
+        [
+          "",
+          "3",
+          "在網際網路中，每一台連上網路的設備都需要一個獨一無二的識別號碼以便互相通訊，這個號碼被稱為什麼位址 (Address)？"
+        ],
+        [],
+        [
+          "",
+          "4",
+          "負責管理電腦硬體資源並提供應用程式執行環境的系統軟體（例如 Windows、macOS 或 Linux），我們統稱為什麼？"
+        ],
+        [],
+        [
+          "",
+          "5",
+          "有一種資料結構的特性是「後進先出」(Last-In, First-Out, LIFO)，就像是疊盤子一樣，最後放上去的盤子會最先被拿走，這種資料結構稱為什麼？"
+        ],
+        [],
+        [
+          "",
+          "6",
+          "在撰寫程式時，解決特定問題的明確步驟與規則集合，我們稱之為什麼 (Algorithm)？"
+        ]
+      ],
+      "merges": [
+        {
+          "sheetId": 1000,
+          "startRowIndex": 1,
+          "endRowIndex": 2,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 2,
+          "endRowIndex": 3,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 3,
+          "endRowIndex": 4,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 3,
+          "endRowIndex": 4,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 4,
+          "endRowIndex": 5,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 4,
+          "endRowIndex": 5,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 5,
+          "endRowIndex": 6,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 6,
+          "endRowIndex": 7,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 6,
+          "endRowIndex": 7,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 7,
+          "endRowIndex": 8,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 8,
+          "endRowIndex": 9,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 8,
+          "endRowIndex": 9,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 9,
+          "endRowIndex": 10,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 10,
+          "endRowIndex": 11,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 10,
+          "endRowIndex": 11,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 11,
+          "endRowIndex": 12,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 12,
+          "endRowIndex": 13,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 12,
+          "endRowIndex": 13,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 13,
+          "endRowIndex": 14,
+          "startColumnIndex": 1,
+          "endColumnIndex": 8
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 14,
+          "endRowIndex": 15,
+          "startColumnIndex": 2,
+          "endColumnIndex": 6
+        },
+        {
+          "sheetId": 1000,
+          "startRowIndex": 14,
+          "endRowIndex": 15,
+          "startColumnIndex": 6,
+          "endColumnIndex": 8
+        }
+      ]
+    }
+  ]
+}

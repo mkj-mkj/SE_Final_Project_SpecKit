@@ -1,0 +1,99 @@
+{
+  "sheetTitle": "學習單",
+  "headerRow": 3,
+  "numberCol": 1,
+  "answerCol": 6,
+  "questions": [
+    {
+      "number": 1,
+      "isGroup": false,
+      "slots": [
+        {
+          "subNo": 1,
+          "sheetTitle": "學習單",
+          "row": 4,
+          "col": 6,
+          "a1": "G5",
+          "prefix": "",
+          "originalValue": ""
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "isGroup": false,
+      "slots": [
+        {
+          "subNo": 1,
+          "sheetTitle": "學習單",
+          "row": 6,
+          "col": 6,
+          "a1": "G7",
+          "prefix": "",
+          "originalValue": ""
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "isGroup": false,
+      "slots": [
+        {
+          "subNo": 1,
+          "sheetTitle": "學習單",
+          "row": 8,
+          "col": 6,
+          "a1": "G9",
+          "prefix": "",
+          "originalValue": ""
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "isGroup": false,
+      "slots": [
+        {
+          "subNo": 1,
+          "sheetTitle": "學習單",
+          "row": 10,
+          "col": 6,
+          "a1": "G11",
+          "prefix": "",
+          "originalValue": ""
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "isGroup": false,
+      "slots": [
+        {
+          "subNo": 1,
+          "sheetTitle": "學習單",
+          "row": 12,
+          "col": 6,
+          "a1": "G13",
+          "prefix": "",
+          "originalValue": ""
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "isGroup": false,
+      "slots": [
+        {
+          "subNo": 1,
+          "sheetTitle": "學習單",
+          "row": 14,
+          "col": 6,
+          "a1": "G15",
+          "prefix": "",
+          "originalValue": ""
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
