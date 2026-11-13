@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.2（2026-11-13：資料庫改用 node:sqlite、E2E 改用 Edge；新增 §14.1 子功能對照） |
+| 版本 | v1.3（2026-11-13：同步 PRD v1.1——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制） |
 | 需求來源 | `docs/PRD.md`（FR-01～FR-12、E1～E5、E7） |
 | 測試規範 | `docs/TEST_SPEC.md` |
 | 讀者 | 實作 agent（主要）、測試 agent、組員 |
@@ -151,6 +151,7 @@ export const MAX_WINDOW_SEC = 10;
 export const WITHDRAW_LIMIT_MS = 10_000;
 export const MAX_ANSWER_LENGTH = 200;
 export const MAX_NICKNAME_LENGTH = 20;
+export const NICKNAME_PATTERN = /^[\u3400-\u4DBF\u4E00-\u9FFFA-Za-z0-9]+$/; // 中文字（基本平面＋擴充 A）、英文字母、數字
 export const ROOM_CODE_LENGTH = 6;
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去除 I O 0 1
 export const DRAFT_DEBOUNCE_MS = 300;
@@ -786,7 +787,7 @@ io('/', { auth: { token: memberToken } });
 | `/` | Home：「我是老師」「我是學生」兩個按鈕 | — |
 | `/teacher/login` | TeacherLogin | — |
 | `/teacher` | TeacherDashboard | sessionStorage 有 teacher token，否則導向 `/teacher/login` |
-| `/join` | Join；支援 `?room=ABC123` 預填 | — |
+| `/join` | Join；支援 `?room=ABC123` 預填 | localStorage 有 member token 時先 `GET /api/play/state`：200 → 導向 `/play`；401 → `clearMember()`，以原 roomCode 預填並顯示加入表單；無 token → 顯示加入表單 |
 | `/play` | Play | localStorage 有 member token，否則導向 `/join` |
 
 ### 10.2 客戶端狀態與儲存（`storage.ts`）
@@ -836,6 +837,7 @@ useServerClock(serverNow: number | undefined): () => number; // 回傳校正後�
 | `PhaseBadge` | 顯示階段 | `phase-badge`（文字：準備中／等待開始／搶答中／已結束） |
 | `ErrorBanner` | 顯示錯誤訊息（`messages.ts` 對照） | `error-banner` |
 | `LoginForm` | 老師登入 | `teacher-password`、`teacher-login-submit` |
+| `TeacherDashboard`（頁面） | 建立活動（只在沒有活動時顯示）；登出（按下 → `clearTeacher()`、中斷 Socket、導向 `/teacher/login`；不呼叫伺服器） | `btn-create-session`、`teacher-logout` |
 | `SettingsForm` | 組數、模式、視窗秒數 | `settings-team-count`、`settings-mode-speed`、`settings-mode-fair`、`settings-window-sec`、`settings-save` |
 | `ImportForm` | 貼上網址並匯入 | `import-input`、`import-submit` |
 | `ImportSummary` | 匯入結果 | `import-summary`、`import-question-count`、`import-group-count`、`import-warning-{i}` |
@@ -976,7 +978,7 @@ export const MESSAGES: Record<ErrorCode, string>;
 | SHEETS_PERMISSION_DENIED | 403 | 沒有權限存取試算表，請將試算表共用給服務帳號 |
 | SHEETS_NOT_FOUND | 404 | 找不到試算表 |
 | SHEETS_ERROR | 502 | Google Sheets 發生錯誤，請稍後再試 |
-| INVALID_NICKNAME | 422 | 暱稱需為 1–20 個字 |
+| INVALID_NICKNAME | 422 | 暱稱需為 1–20 個中文字、英文字母或數字 |
 | NICKNAME_TAKEN | 409 | 這個暱稱在組內已被使用 |
 | TEAM_HAS_MEMBERS | 409 | 要移除的組別已有成員 |
 | ANSWER_REQUIRED | 422 | 請填寫答案 |
@@ -991,7 +993,7 @@ export const MESSAGES: Record<ErrorCode, string>;
 `shared/src/validation.ts`：
 
 ```ts
-export function normalizeNickname(s: string): string;   // trim；長度 1–20，否則 throw INVALID_NICKNAME
+export function normalizeNickname(s: string): string;   // trim；長度 1–20 且符合 NICKNAME_PATTERN，否則 throw INVALID_NICKNAME
 export function nicknameKey(s: string): string;         // normalizeNickname(s).toLowerCase()
 export function normalizeRoomCode(s: string): string;   // trim + toUpperCase；需為 6 碼且字元在 ROOM_CODE_ALPHABET，否則 SESSION_NOT_FOUND
 export function validateAnswers(answers: string[], subCount: number, isGroup: boolean): string[]; // 回傳 trim 後；錯誤碼依 §7.9 submit 步驟 4–5
@@ -1004,7 +1006,7 @@ export function validateAnswers(answers: string[], subCount: number, isGroup: bo
 ### 12.1 老師：建立與匯入
 
 1. `/teacher/login` 輸入密碼 → `POST /api/teacher/login` → 存 `quiz.teacher` → 導向 `/teacher`。
-2. `/teacher` 掛載：`GET /sessions/current`；404 → 顯示「建立活動」按鈕；200 → 顯示對應階段畫面並以 `{token, sessionId}` 連 Socket。
+2. `/teacher` 掛載：`GET /sessions/current`；404 → 顯示 `btn-create-session`；200 → 不顯示 `btn-create-session`（系統同一時間只有一個活動，PRD §5.1 步驟 2），顯示對應階段畫面並以 `{token, sessionId}` 連 Socket。
 3. 建立活動：`POST /sessions` → 顯示房間碼、設定表單、匯入表單。
 4. 匯入：`POST /sessions/:id/import` → 成功顯示 ImportSummary 與題號清單；失敗顯示 ErrorBanner（HEADER_NOT_FOUND 時附範本格式說明）。
 5. READY：可重新匯入、改設定；TeamList 隨學生加入即時更新。
@@ -1028,6 +1030,15 @@ alt localStorage 有 quiz.member
   end
 else 無 token
   C -> C : 導向 /join
+end
+S -> C : 開啟 /join
+alt localStorage 有 quiz.member
+  C -> SV : GET /api/play/state (Bearer token)
+  alt 200
+    C -> C : 導向 /play（不允許重複加入）
+  else 401
+    C -> C : clearMember()；預填原房間碼
+  end
 end
 S -> C : 輸入房間碼
 C -> SV : GET /api/public/sessions/:roomCode
@@ -1146,7 +1157,7 @@ SV --> T : CSV（UTF-8 BOM）
 
 | 子功能 | 後端範圍 [BE] | 前端範圍 [FE] | 必須通過的測試 |
 | --- | --- | --- | --- |
-| 001-session-and-join | 專案骨架（§2、§3：workspaces、tsconfig、ESLint、Vitest 與覆蓋率門檻、`.env.example`、`.gitignore`）；`shared/` 全部（§3.3、§4、§11 的 types、errors、constants、validation）；`ports/*`（§7.1）；`db/schema.sql`（§5 全部資料表）、`db/db.ts`（openDb、withTransaction）、repo（sessions、teams、members）；`domain/phase.ts`（§6 全部）；`domain/projections.ts`（只做 session、teams、members；questions、cells、drafts、mySubmissions 回傳空陣列或空物件，results 為 null，importSummary 為 null）；`authService`（§7.10）；`sessionService` 的 createSession、getCurrentSession、getTeacherView、updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline；`http/auth.ts`、`errorHandler.ts`；路由 `POST /api/teacher/login`、`POST /api/teacher/sessions`、`GET /api/teacher/sessions/current`、`GET /api/teacher/sessions/:id`、`PATCH /api/teacher/sessions/:id/settings`、§8.2 全部、`GET /api/play/state`；`realtime/broadcaster.ts`、`realtime/socket.ts`（§7.11、§9）；`app.ts`、`index.ts`、`config.ts`；測試替身 fakeClock、manualScheduler、seqIdGen、recordingBroadcaster、fakeIo、inMemorySheets、makeTestService | `main.tsx`、`App.tsx`（§10.1 全部路由）、`api.ts`、`socket.ts`、`storage.ts`（§10.2）、`messages.ts`（§10.6）；useTeacher 的 view、error、busy、createSession、updateSettings；usePlay 的 view、me、error；頁面 Home、TeacherLogin、Join、TeacherDashboard（建立活動、RoomCode、SettingsForm、TeamList、PhaseBadge、ErrorBanner）、Play（TeamHeader 與等待畫面）；元件 LoginForm、SettingsForm、RoomCode、TeamList、PhaseBadge、ErrorBanner、JoinForm、TeamHeader | UT-VAL、UT-ERR、UT-PHASE、UT-REPO-01、UT-REPO-07、UT-AUTH、UT-SVC-CREATE、UT-SVC-JOIN、UT-PROJ-10、UT-BC、UT-UI-STORE、UT-UI-MSG、UT-UI-PHASE、UT-UI-LOGIN、UT-UI-SET、UT-UI-JOIN、UT-UI-PLAY-01～02、IT-AUTH-01～03、IT-ONLINE-01、E2E-03 |
+| 001-session-and-join | 專案骨架（§2、§3：workspaces、tsconfig、ESLint、Vitest 與覆蓋率門檻、`.env.example`、`.gitignore`）；`shared/` 全部（§3.3、§4、§11 的 types、errors、constants、validation）；`ports/*`（§7.1）；`db/schema.sql`（§5 全部資料表）、`db/db.ts`（openDb、withTransaction）、repo（sessions、teams、members）；`domain/phase.ts`（§6 全部）；`domain/projections.ts`（只做 session、teams、members；questions、cells、drafts、mySubmissions 回傳空陣列或空物件，results 為 null，importSummary 為 null）；`authService`（§7.10）；`sessionService` 的 createSession、getCurrentSession、getTeacherView、updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline；`http/auth.ts`、`errorHandler.ts`；路由 `POST /api/teacher/login`、`POST /api/teacher/sessions`、`GET /api/teacher/sessions/current`、`GET /api/teacher/sessions/:id`、`PATCH /api/teacher/sessions/:id/settings`、§8.2 全部、`GET /api/play/state`；`realtime/broadcaster.ts`、`realtime/socket.ts`（§7.11、§9）；`app.ts`、`index.ts`、`config.ts`；測試替身 fakeClock、manualScheduler、seqIdGen、recordingBroadcaster、fakeIo、inMemorySheets、makeTestService | `main.tsx`、`App.tsx`（§10.1 全部路由）、`api.ts`、`socket.ts`、`storage.ts`（§10.2）、`messages.ts`（§10.6）；useTeacher 的 view、error、busy、createSession、updateSettings；usePlay 的 view、me、error；頁面 Home、TeacherLogin、Join、TeacherDashboard（建立活動，只在沒有活動時顯示；登出；RoomCode、SettingsForm、TeamList、PhaseBadge、ErrorBanner）、Play（TeamHeader 與等待畫面）；元件 LoginForm、SettingsForm、RoomCode、TeamList、PhaseBadge、ErrorBanner、JoinForm、TeamHeader | UT-VAL、UT-ERR、UT-PHASE、UT-REPO-01、UT-REPO-07、UT-AUTH、UT-SVC-CREATE、UT-SVC-JOIN、UT-PROJ-10、UT-BC、UT-UI-STORE、UT-UI-MSG、UT-UI-PHASE、UT-UI-LOGIN、UT-UI-SET、UT-UI-JOIN、UT-UI-DASH-01～03、UT-UI-PLAY-01～02、IT-AUTH-01～03、IT-ONLINE-01、E2E-03、E2E-18 |
 | 002-guided-notes-import | `sheets/a1.ts`（§7.2）；`sheets/parser.ts`（§7.3，含 summarize）；`fakeGateway.ts`（fetchSnapshot、getSnapshot、reset）；`googleGateway.ts`（createGoogleGateway、fetchSnapshot 與錯誤對照）；repo（questions、answer_slots）；`sessionService.importSheet`；projections 補上 questionInfo、TeacherView 的 questions 與 importSummary、TeamView 的 questions；路由 `POST /api/teacher/sessions/:id/import`、`devRoutes`（§8.4）；`config.ts` 依 `SHEETS_MODE` 組裝 gateway；測試替身 fixtures.ts，makeTestService 預設載入兩份 fixture | ImportForm、ImportSummary；useTeacher.importSheet；TeacherDashboard 的 READY 畫面（題號清單，題組標示子題） | UT-A1、UT-PARSE、UT-GW-01、UT-GW-03、UT-GW-04、UT-SVC-IMPORT、UT-PROJ-01、UT-UI-IMPORT、E2E-01、E2E-02；手動 MA-01、MA-02 |
 | 003-live-quiz | `domain/ranking.ts`（§7.6）、`domain/settlement.ts`（§7.7）；projections 其餘部分（TeacherView 的 cells、題目 state、windowEndsAt、winnerTeamId、teams.score；TeamView 的 drafts、mySubmissions；buildResults）；repo（drafts、submissions、seq）；`sessionService` 的 start、end、reset、updateDraft、submit、withdraw、settleWindow、recover（§7.9 演算法）；`boot/recover.ts`（§7.12）；路由 `POST /api/teacher/sessions/:id/start`、`/end`、`/reset`、`PUT /api/play/drafts/:questionId`、`POST /api/play/submissions`、`POST /api/play/submissions/:id/withdraw`；推播範圍依 §9.3；測試替身 seed.ts | `format.ts`、`useServerClock`；useTeacher 的 start、end、reset；usePlay 的 setDraft、submit、withdraw；ControlBar、StatusGrid（§10.4 StatusCell 規則）、AnswerCard（§10.4 狀態表中 rejected 以外的全部狀態）；Play 的搶答畫面 | UT-RANK、UT-SETTLE、UT-PROJ-02～08、UT-REPO-02～06、UT-SVC-PHASE、UT-SVC-DRAFT、UT-SVC-SUB、UT-SVC-FAIR、UT-SVC-WD、UT-SVC-RECOVER、UT-UI-FMT、UT-UI-CLOCK、UT-UI-CTRL、UT-UI-GRID、UT-UI-CARD-01～05、IT-PHASE-01、IT-VAL-01、IT-VIS-01、IT-SYNC-01、IT-RT-01、IT-CONC-01、IT-RECON-01～02、IT-RESTART-01、IT-PERF-01、E2E-04～11 |
 | 004-results-export | `sheets/exporter.ts`（§7.4）；`googleGateway.writeCells`、`fakeGateway.writeCells`；`export/csv.ts`（§7.5）；`projections.buildCsvRows`；`sessionService` 的 rejectWinner、exportToSheet、restoreSheet、exportCsv；路由 `POST /api/teacher/sessions/:id/questions/:qid/reject-winner`、`/export`、`/restore`、`GET /export.csv` | useTeacher 的 rejectWinner、exportToSheet、restoreSheet、downloadCsv；ResultsTable、ExportPanel、StudentResults；AnswerCard 的 rejected 狀態；Play 的 ENDED 畫面 | UT-EXP、UT-CSV、UT-GW-02、UT-GW-05、UT-PROJ-09、UT-SVC-REJ、UT-SVC-EXPORT、UT-UI-RES、UT-UI-EXP、UT-UI-CARD-06、UT-UI-PLAY-03、IT-FLOW-01、IT-CSV-01、IT-VIS-02、E2E-12～17；手動 MA-03～08；全部測試回歸與 TEST_SPEC §2.3 覆蓋率門檻 |

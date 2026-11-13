@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.1（2026-11-13：資料庫改用 node:sqlite、E2E 改用 Edge） |
+| 版本 | v1.2（2026-11-13：同步 PRD v1.1／TECH_SPEC v1.3——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制、組別人數不設上限） |
 | 依據 | `docs/PRD.md`、`docs/TECH_SPEC.md`（介面契約） |
 | 讀者 | 測試 agent（主要）、實作 agent、助教 |
 
@@ -178,6 +178,8 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-VAL-09 | 單題空白 `['  ']` | ANSWER_REQUIRED |
 | UT-VAL-10 | 題組 `['CPU','']` | GROUP_INCOMPLETE |
 | UT-VAL-11 | 200 字、201 字 | 200 通過；201 ANSWER_TOO_LONG |
+| UT-VAL-12 | `normalizeNickname`：`'小 明'`、`'Amy_01'`、`'小明😀'`、`'ＡＢ'`（全形）、`'𠀀'`（擴充 B） | 皆 INVALID_NICKNAME |
+| UT-VAL-13 | `normalizeNickname`：`'Amy01'`、`'小明2'`、`'㐀'`（擴充 A） | 皆通過，回傳原字串 |
 
 **UT-ERR（`errors.ts`）**
 
@@ -297,14 +299,14 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 
 **UT-PROJ（`projections.ts`，FR-04／FR-05／FR-09／FR-10）**
 
-測試資料：2 組（A、B），B 的暱稱為 `SECRET-NICK-B`、草稿與答案為 `SECRET-ANS-B`。
+測試資料：2 組（A、B），B 的暱稱為 `SECRETNICKB`（v1.2 修改：原為 `SECRET-NICK-B`，含 `-` 不符暱稱字元限制）、草稿與答案為 `SECRET-ANS-B`。
 
 | ID | 情境 | 期望 |
 | --- | --- | --- |
 | UT-PROJ-01 | `questionInfo`：題組有前綴、題組無前綴、單題 | `['（1）','（2）']`、`['（1）','（2）']`、`['']` |
 | UT-PROJ-02 | `projectTeacherView`（2 題 × 2 組） | `cells.length===4`；winnerTeamId 正確；包含 B 的答案 |
 | UT-PROJ-03 | 同組同題有 withdrawn 後再 active | cell 取 seq 最大的一筆 |
-| UT-PROJ-04 | RUNNING 中 `projectTeamView(agg, A)` | `JSON.stringify` 不含 `SECRET-NICK-B`、`SECRET-ANS-B`、B 的 member id、B 的 submission id |
+| UT-PROJ-04 | RUNNING 中 `projectTeamView(agg, A)` | `JSON.stringify` 不含 `SECRETNICKB`、`SECRET-ANS-B`、B 的 member id、B 的 submission id（v1.2 修改：暱稱字串更新） |
 | UT-PROJ-05 | RUNNING 中 TeamView 遞迴掃描所有 key | 不存在 `rank`、`isWinner`、`score`、`scores`、`state`、`windowEndsAt`、`winnerTeamId`；`results===null` |
 | UT-PROJ-06 | ENDED 中 TeamView | `results` 非 null，含所有組的 ranking 與 scores |
 | UT-PROJ-07 | active 送出 serverTime=T | `withdrawableUntil===T+10000`；withdrawn → null |
@@ -382,6 +384,8 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-SVC-JOIN-06 | `resolveMember('bad')` | UNAUTHORIZED |
 | UT-SVC-JOIN-07 | RUNNING、ENDED 中加入 | 成功 |
 | UT-SVC-JOIN-08 | 用原 token 再次 `getTeamView` | 回到同一組，資料一致（重連） |
+| UT-SVC-JOIN-09 | 以暱稱 `'小明😀'` 加入 | INVALID_NICKNAME；該組 memberCount 不變 |
+| UT-SVC-JOIN-10 | 同一組連續加入 25 位不同暱稱的成員 | 全部成功；`getPublicInfo` 該組 memberCount 25（不設人數上限） |
 
 **UT-SVC-DRAFT（FR-08 組內共編）**
 
@@ -506,6 +510,11 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-UI-JOIN-02 | JoinForm | 未選組或暱稱空白 | `join-submit` disabled |
 | UT-UI-JOIN-03 | JoinForm | api 回 NICKNAME_TAKEN | 顯示錯誤，不導頁 |
 | UT-UI-JOIN-04 | JoinForm | 成功 | saveMember 後導向 `/play` |
+| UT-UI-JOIN-05 | Join | 有 member token 且 `GET /state` 回 200 | 導向 `/play`，不顯示 JoinForm |
+| UT-UI-JOIN-06 | Join | 有 member token 且 `GET /state` 回 401 | 呼叫 clearMember；`join-room` 預填原 roomCode |
+| UT-UI-DASH-01 | TeacherDashboard | `GET /sessions/current` 回 404 | 顯示 `btn-create-session` |
+| UT-UI-DASH-02 | TeacherDashboard | `GET /sessions/current` 回 200 | 不存在 `btn-create-session` |
+| UT-UI-DASH-03 | TeacherDashboard | 按 `teacher-logout` | 呼叫 clearTeacher；導向 `/teacher/login`；api 未被呼叫 |
 | UT-UI-CARD-01 | AnswerCard | phase READY | 輸入與送出 disabled |
 | UT-UI-CARD-02 | AnswerCard | RUNNING、題組只填一格 | 送出 disabled；填滿後可用 |
 | UT-UI-CARD-03 | AnswerCard | 輸入文字 | 呼叫 setDraft（debounce 300 ms，用 fake timers 驗證只呼叫 1 次 PUT） |
@@ -563,13 +572,14 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | E2E-08 | E1 | 第 2 組第 1 題只填（1） | `btn-submit-1` disabled；填（2）後可送出，顯示 `submitted-1` |
 | E2E-09 | E4 | 第 3 組送出第 4 題後 3 秒內按撤回，再修改送出 | 出現倒數；撤回後可編輯；重送成功；老師看到「已撤回」與新送出 |
 | E2E-10 | E7 | 第 1 組成員 Y 重新整理頁面 | 回到第 1 組，`my-nickname` 相同，送出狀態保留 |
-| E2E-11 | E3 | 新活動、公平模式 3 秒：第 1 組先拿第 3 題（得 1 分）；第 4 題第 1 組先送，第 2 組 1 秒後送 | 老師 `question-state-4` 顯示判定中，3 秒後第 2 組 `★ 得主` |
+| E2E-11 | E3 | （v1.2 修改：系統只有一個活動，不再建立新活動）老師按 `btn-end` 再按 `btn-reset` 重新開始一輪（同一活動，設定維持公平模式 3 秒），再按 `btn-start`；第 1 組先拿第 3 題（得 1 分）；第 4 題第 1 組先送，第 2 組 1 秒後送 | 老師 `question-state-4` 顯示判定中，3 秒後第 2 組 `★ 得主` |
 | E2E-12 | FR-03、FR-05、FR-09 | 老師 `btn-end` | 學生頁顯示 `student-results`；老師顯示 `results-table` 與分數 |
 | E2E-13 | E5 | 老師按 `btn-reject-3` | 第 3 題得主變為第 2 名組別；學生結果頁同步更新 |
 | E2E-14 | FR-06 | 老師 `btn-export-sheet` | `export-result` 顯示格數；`GET /api/dev/fake-sheets/fixture-template-a` 中對應儲存格為「前綴＋答案」，其他儲存格與 fixture 相同 |
 | E2E-15 | 還原 | 老師 `btn-restore-sheet` | fake sheet 與 fixture 完全相同 |
 | E2E-16 | E2 | 老師 `btn-download-csv` | 下載檔以 BOM 開頭；列數正確 |
 | E2E-17 | reset | 老師 `btn-reset` | 回到等待開始；學生頁清空送出狀態，組別保留 |
+| E2E-18 | E7 | （接在 E2E-03 之後執行）E2E-03 的某位學生在同一 context 開啟 `/join` | 自動導向 `/play`，`my-nickname` 不變；老師端該組 `team-member-count-{index}` 不變 |
 
 ---
 
@@ -674,6 +684,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | E3 公平機制 | UT-SETTLE-01～06、UT-SVC-FAIR-01～10、UT-SVC-PHASE-03、UT-UI-SET-01 | IT-RESTART-01 | E2E-11 |
 | E4 撤回 | UT-SVC-WD-01～06、UT-PROJ-07、UT-RANK-04、UT-UI-CARD-04～05 | IT-FLOW-01 | E2E-09 |
 | E5 人工判錯 | UT-SVC-REJ-01～06、UT-RANK-05、09、UT-UI-RES-02、UT-UI-CARD-06 | IT-FLOW-01 | E2E-13 |
-| E7 斷線重連 | UT-SVC-JOIN-08、UT-SVC-RECOVER-01～03、UT-UI-STORE-01～03、UT-UI-PLAY-01～02 | IT-RECON-01～02、IT-ONLINE-01、IT-RESTART-01 | E2E-10 |
-| 身分（房間碼＋組別＋暱稱） | UT-VAL-01～06、UT-SVC-JOIN-01～07、UT-AUTH-01～04、UT-UI-JOIN-01～04 | IT-AUTH-01～03 | E2E-03 |
+| E7 斷線重連 | UT-SVC-JOIN-08、UT-SVC-RECOVER-01～03、UT-UI-STORE-01～03、UT-UI-PLAY-01～02、UT-UI-JOIN-05～06 | IT-RECON-01～02、IT-ONLINE-01、IT-RESTART-01 | E2E-10、E2E-18 |
+| 身分（房間碼＋組別＋暱稱） | UT-VAL-01～06、12～13、UT-SVC-JOIN-01～07、09～10、UT-AUTH-01～04、UT-UI-JOIN-01～04 | IT-AUTH-01～03 | E2E-03 |
+| 老師管理頁（PRD §5.1 步驟 1–2：登出、單一活動） | UT-UI-DASH-01～03 | — | — |
 | 錯誤處理 | UT-ERR-01～02、UT-UI-MSG-01 | IT-VAL-01 | MA-05 |
