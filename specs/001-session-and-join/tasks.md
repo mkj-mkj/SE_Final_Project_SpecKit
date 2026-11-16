@@ -134,35 +134,35 @@ description: "Task list for 001-session-and-join（依層次分 Phase：Setup �
 
 ### 3.2 hooks
 
-- [ ] T058 [FE] 撰寫 UT-UI-DASH-01（`getCurrentSession` 回 404 → 存在 `btn-create-session`）、UT-UI-DASH-02（回 200 → 不存在 `btn-create-session`）、UT-UI-DASH-03（按 `teacher-logout` → 呼叫 `clearTeacher`、導向 `/teacher/login`、api 未被呼叫），以 MemoryRouter、`vi.mock('../../src/api')`、`vi.mock('../../src/socket')`，執行並確認失敗（`client/test/pages/TeacherDashboard.test.tsx`）
-- [ ] T059 [FE] 撰寫 UT-UI-PLAY-01（無 member token → 導向 `/join`）、UT-UI-PLAY-02（`getPlayState` 回 401 → 呼叫 `clearMember` 並導向 `/join?room=<roomCode>`），執行並確認失敗（`client/test/pages/Play.test.tsx`）
-- [ ] T060 [FE] 實作 `useTeacher()` 的 `view`、`error`、`busy`、`createSession(input)`、`updateSettings(input)`（§10.3）：掛載時 `getCurrentSession`——200 → 設 view 並 `connectTeacher(token, view.session.id)`，收到 `teacher:state` 以快照**整份取代** view；404 → view＝null；401 或 socket UNAUTHORIZED → `clearTeacher()` 並導向 `/teacher/login`；錯誤以 `AppErrorView` 存入 error；卸載時 disconnect。覆蓋測試：UT-UI-DASH-01～03（`client/src/hooks/useTeacher.ts`）
-- [ ] T061 [FE] 實作 `usePlay()` 的 `view`、`me`、`error`（§10.3）：無 `quiz.member` → 導向 `/join`；`getPlayState` 200 → 設 view 與 me 並 `connectMember(token)`，收到 `team:state` 以快照取代 view；401 或 socket UNAUTHORIZED → `clearMember()` 並導向 `/join?room=<原 roomCode>`。覆蓋測試：UT-UI-PLAY-01～02（`client/src/hooks/usePlay.ts`）
+- [X] T058 [FE] 撰寫 UT-UI-DASH-01（`getCurrentSession` 回 404 → 存在 `btn-create-session`）、UT-UI-DASH-02（回 200 → 不存在 `btn-create-session`）、UT-UI-DASH-03（按 `teacher-logout` → 呼叫 `clearTeacher`、導向 `/teacher/login`、api 未被呼叫），以 MemoryRouter、`vi.mock('../../src/api')`、`vi.mock('../../src/socket')`，執行並確認失敗（`client/test/pages/TeacherDashboard.test.tsx`）
+- [X] T059 [FE] 撰寫 UT-UI-PLAY-01（無 member token → 導向 `/join`）、UT-UI-PLAY-02（`getPlayState` 回 401 → 呼叫 `clearMember` 並導向 `/join?room=<roomCode>`），執行並確認失敗（`client/test/pages/Play.test.tsx`）
+- [X] T060 [FE] 實作 `useTeacher()` 的 `view`、`error`、`busy`、`createSession(input)`、`updateSettings(input)`（§10.3）：掛載時 `getCurrentSession`——200 → 設 view 並 `connectTeacher(token, view.session.id)`，收到 `teacher:state` 以快照**整份取代** view；404 → view＝null；401 或 socket UNAUTHORIZED → `clearTeacher()` 並導向 `/teacher/login`；錯誤以 `AppErrorView` 存入 error；卸載時 disconnect。覆蓋測試：UT-UI-DASH-01～03（`client/src/hooks/useTeacher.ts`）
+- [X] T061 [FE] 實作 `usePlay()` 的 `view`、`me`、`error`（§10.3）：無 `quiz.member` → 導向 `/join`；`getPlayState` 200 → 設 view 與 me 並 `connectMember(token)`，收到 `team:state` 以快照取代 view；401 或 socket UNAUTHORIZED → `clearMember()` 並導向 `/join?room=<原 roomCode>`。覆蓋測試：UT-UI-PLAY-01～02（`client/src/hooks/usePlay.ts`）
 
 ### 3.3 元件
 
-- [ ] T062 [P] [FE] 撰寫 UT-UI-PHASE-01（PhaseBadge 對 SETUP、READY、RUNNING、ENDED 依序顯示「準備中」「等待開始」「搶答中」「已結束」），執行並確認失敗（`client/test/components/PhaseBadge.test.tsx`）
-- [ ] T063 [FE] 實作 `PhaseBadge`（`data-testid="phase-badge"`，Phase → 中文對照），讓 T062 通過（`client/src/components/PhaseBadge.tsx`）
-- [ ] T064 [FE] 實作 `ErrorBanner`（`data-testid="error-banner"`，props `error: AppErrorView | null`，以 `messageOf(error.code)` 顯示；null 時不渲染）。覆蓋測試：UT-UI-LOGIN-02、UT-UI-JOIN-03（`client/src/components/ErrorBanner.tsx`）
-- [ ] T065 [P] [FE] 撰寫 UT-UI-LOGIN-01（輸入密碼送出 → 呼叫 `api.login`，成功 `saveTeacher` 並導向 `/teacher`）、UT-UI-LOGIN-02（api 丟 UNAUTHORIZED → `error-banner` 顯示「驗證失敗，請重新登入或加入」），執行並確認失敗（`client/test/components/LoginForm.test.tsx`）
-- [ ] T066 [FE] 實作 `LoginForm`（`teacher-password`、`teacher-login-submit`；成功 `saveTeacher({ token })` 並 `navigate('/teacher')`；失敗顯示 ErrorBanner），讓 T065 通過（`client/src/components/LoginForm.tsx`）
-- [ ] T067 [P] [FE] 撰寫 UT-UI-SET-01（選純速度 → 不存在 `settings-window-sec`）、UT-UI-SET-02（組數輸入 25 → `settings-save` disabled 或顯示錯誤），執行並確認失敗（`client/test/components/SettingsForm.test.tsx`）
-- [ ] T068 [FE] 實作 `SettingsForm`（props：目前 session、`onSave`、`disabled`；`settings-team-count`（2–20）、`settings-mode-speed`、`settings-mode-fair`、`settings-window-sec`（只在 fair 時渲染，1–10）、`settings-save`（任一值超出範圍時 disabled））；只在 phase 為 SETUP／READY 時可編輯，讓 T067 通過（`client/src/components/SettingsForm.tsx`）
-- [ ] T069 [P] [FE] 實作 `RoomCode`（`data-testid="room-code"` 大字顯示房間碼，並顯示加入網址 `${location.origin}/join?room=<roomCode>`）。覆蓋測試：E2E-03（`client/src/components/RoomCode.tsx`）
-- [ ] T070 [P] [FE] 實作 `TeamList`（每組 `team-row-{index}`，`team-member-count-{index}` 顯示人數，每位成員顯示暱稱與上線／離線標示）。覆蓋測試：E2E-03、E2E-18（`client/src/components/TeamList.tsx`）
-- [ ] T071 [P] [FE] 撰寫 UT-UI-JOIN-01（輸入房間碼 → `join-room-next` → 呼叫 getPublicInfo，顯示各組 `join-team-{index}` 與人數）、UT-UI-JOIN-02（未選組或暱稱空白 → `join-submit` disabled）、UT-UI-JOIN-03（api 丟 NICKNAME_TAKEN → 顯示錯誤、不導頁）、UT-UI-JOIN-04（成功 → `saveMember` 後導向 `/play`），執行並確認失敗（`client/test/components/JoinForm.test.tsx`）
-- [ ] T072 [FE] 實作 `JoinForm`（props `initialRoom`；`join-room` → `join-room-next` 呼叫 `getPublicInfo` → `join-team-{index}`（組名＋人數）→ `join-nickname` → `join-submit`（未選組或暱稱 trim 後為空時 disabled）→ 成功 `saveMember({ token, roomCode, memberId })` 並 `navigate('/play')`；錯誤以 ErrorBanner 顯示且不導頁），讓 T071 通過（`client/src/components/JoinForm.tsx`）
-- [ ] T073 [P] [FE] 實作 `TeamHeader`（`team-name`、`my-nickname`、`team-members`，組員依暱稱列出並標示上線）。覆蓋測試：E2E-18（`client/src/components/TeamHeader.tsx`）
+- [X] T062 [P] [FE] 撰寫 UT-UI-PHASE-01（PhaseBadge 對 SETUP、READY、RUNNING、ENDED 依序顯示「準備中」「等待開始」「搶答中」「已結束」），執行並確認失敗（`client/test/components/PhaseBadge.test.tsx`）
+- [X] T063 [FE] 實作 `PhaseBadge`（`data-testid="phase-badge"`，Phase → 中文對照），讓 T062 通過（`client/src/components/PhaseBadge.tsx`）
+- [X] T064 [FE] 實作 `ErrorBanner`（`data-testid="error-banner"`，props `error: AppErrorView | null`，以 `messageOf(error.code)` 顯示；null 時不渲染）。覆蓋測試：UT-UI-LOGIN-02、UT-UI-JOIN-03（`client/src/components/ErrorBanner.tsx`）
+- [X] T065 [P] [FE] 撰寫 UT-UI-LOGIN-01（輸入密碼送出 → 呼叫 `api.login`，成功 `saveTeacher` 並導向 `/teacher`）、UT-UI-LOGIN-02（api 丟 UNAUTHORIZED → `error-banner` 顯示「驗證失敗，請重新登入或加入」），執行並確認失敗（`client/test/components/LoginForm.test.tsx`）
+- [X] T066 [FE] 實作 `LoginForm`（`teacher-password`、`teacher-login-submit`；成功 `saveTeacher({ token })` 並 `navigate('/teacher')`；失敗顯示 ErrorBanner），讓 T065 通過（`client/src/components/LoginForm.tsx`）
+- [X] T067 [P] [FE] 撰寫 UT-UI-SET-01（選純速度 → 不存在 `settings-window-sec`）、UT-UI-SET-02（組數輸入 25 → `settings-save` disabled 或顯示錯誤），執行並確認失敗（`client/test/components/SettingsForm.test.tsx`）
+- [X] T068 [FE] 實作 `SettingsForm`（props：目前 session、`onSave`、`disabled`；`settings-team-count`（2–20）、`settings-mode-speed`、`settings-mode-fair`、`settings-window-sec`（只在 fair 時渲染，1–10）、`settings-save`（任一值超出範圍時 disabled））；只在 phase 為 SETUP／READY 時可編輯，讓 T067 通過（`client/src/components/SettingsForm.tsx`）
+- [X] T069 [P] [FE] 實作 `RoomCode`（`data-testid="room-code"` 大字顯示房間碼，並顯示加入網址 `${location.origin}/join?room=<roomCode>`）。覆蓋測試：E2E-03（`client/src/components/RoomCode.tsx`）
+- [X] T070 [P] [FE] 實作 `TeamList`（每組 `team-row-{index}`，`team-member-count-{index}` 顯示人數，每位成員顯示暱稱與上線／離線標示）。覆蓋測試：E2E-03、E2E-18（`client/src/components/TeamList.tsx`）
+- [X] T071 [P] [FE] 撰寫 UT-UI-JOIN-01（輸入房間碼 → `join-room-next` → 呼叫 getPublicInfo，顯示各組 `join-team-{index}` 與人數）、UT-UI-JOIN-02（未選組或暱稱空白 → `join-submit` disabled）、UT-UI-JOIN-03（api 丟 NICKNAME_TAKEN → 顯示錯誤、不導頁）、UT-UI-JOIN-04（成功 → `saveMember` 後導向 `/play`），執行並確認失敗（`client/test/components/JoinForm.test.tsx`）
+- [X] T072 [FE] 實作 `JoinForm`（props `initialRoom`；`join-room` → `join-room-next` 呼叫 `getPublicInfo` → `join-team-{index}`（組名＋人數）→ `join-nickname` → `join-submit`（未選組或暱稱 trim 後為空時 disabled）→ 成功 `saveMember({ token, roomCode, memberId })` 並 `navigate('/play')`；錯誤以 ErrorBanner 顯示且不導頁），讓 T071 通過（`client/src/components/JoinForm.tsx`）
+- [X] T073 [P] [FE] 實作 `TeamHeader`（`team-name`、`my-nickname`、`team-members`，組員依暱稱列出並標示上線）。覆蓋測試：E2E-18（`client/src/components/TeamHeader.tsx`）
 
 ### 3.4 頁面與路由
 
-- [ ] T074 [P] [FE] 實作 `Home` 頁（「我是老師」→ `/teacher`、「我是學生」→ `/join`）。覆蓋測試：E2E-03（`client/src/pages/Home.tsx`）
-- [ ] T075 [FE] 實作 `TeacherLogin` 頁（渲染 LoginForm）。覆蓋測試：UT-UI-LOGIN-01（`client/src/pages/TeacherLogin.tsx`）
-- [ ] T076 [FE] 實作 `TeacherDashboard` 頁：無 `quiz.teacher` → 導向 `/teacher/login`；使用 `useTeacher`；view 為 null → 只顯示 `btn-create-session`（呼叫 `createSession({})`）；有 view → 顯示 PhaseBadge、RoomCode、SettingsForm（`updateSettings`）、TeamList、ErrorBanner，且**不渲染** `btn-create-session`；`teacher-logout` → `clearTeacher()`、中斷 socket、`navigate('/teacher/login')`，不呼叫 api；讓 T058 通過（`client/src/pages/TeacherDashboard.tsx`）
-- [ ] T077 [FE] 撰寫 UT-UI-JOIN-05（有 member token 且 `getPlayState` 200 → 導向 `/play`，不顯示 JoinForm）、UT-UI-JOIN-06（有 member token 且 401 → 呼叫 `clearMember`，`join-room` 預填原 roomCode），執行並確認失敗（`client/test/pages/Join.test.tsx`）
-- [ ] T078 [FE] 實作 `Join` 頁：掛載時若有 `quiz.member` 先 `getPlayState(token)`——200 → `navigate('/play', { replace: true })` 且不渲染 JoinForm；401 → `clearMember()`，以原 roomCode 作為 `initialRoom`；無 token → 以 `?room=` 作為 `initialRoom`；讓 T077 通過（`client/src/pages/Join.tsx`）
-- [ ] T079 [FE] 實作 `Play` 頁：使用 `usePlay`；顯示 TeamHeader、PhaseBadge、ErrorBanner 與等待畫面（「等待老師開始」；AnswerCard 屬 003），讓 T059 通過（`client/src/pages/Play.tsx`）
-- [ ] T080 [FE] 實作 `main.tsx`（`createRoot` + `BrowserRouter`）與 `App.tsx`（路由 `/` Home、`/teacher/login` TeacherLogin、`/teacher` TeacherDashboard、`/join` Join、`/play` Play，依 TECH_SPEC §10.1）。覆蓋測試：UT-UI-PLAY-01、E2E-03（`client/src/main.tsx`、`client/src/App.tsx`）
+- [X] T074 [P] [FE] 實作 `Home` 頁（「我是老師」→ `/teacher`、「我是學生」→ `/join`）。覆蓋測試：E2E-03（`client/src/pages/Home.tsx`）
+- [X] T075 [FE] 實作 `TeacherLogin` 頁（渲染 LoginForm）。覆蓋測試：UT-UI-LOGIN-01（`client/src/pages/TeacherLogin.tsx`）
+- [X] T076 [FE] 實作 `TeacherDashboard` 頁：無 `quiz.teacher` → 導向 `/teacher/login`；使用 `useTeacher`；view 為 null → 只顯示 `btn-create-session`（呼叫 `createSession({})`）；有 view → 顯示 PhaseBadge、RoomCode、SettingsForm（`updateSettings`）、TeamList、ErrorBanner，且**不渲染** `btn-create-session`；`teacher-logout` → `clearTeacher()`、中斷 socket、`navigate('/teacher/login')`，不呼叫 api；讓 T058 通過（`client/src/pages/TeacherDashboard.tsx`）
+- [X] T077 [FE] 撰寫 UT-UI-JOIN-05（有 member token 且 `getPlayState` 200 → 導向 `/play`，不顯示 JoinForm）、UT-UI-JOIN-06（有 member token 且 401 → 呼叫 `clearMember`，`join-room` 預填原 roomCode），執行並確認失敗（`client/test/pages/Join.test.tsx`）
+- [X] T078 [FE] 實作 `Join` 頁：掛載時若有 `quiz.member` 先 `getPlayState(token)`——200 → `navigate('/play', { replace: true })` 且不渲染 JoinForm；401 → `clearMember()`，以原 roomCode 作為 `initialRoom`；無 token → 以 `?room=` 作為 `initialRoom`；讓 T077 通過（`client/src/pages/Join.tsx`）
+- [X] T079 [FE] 實作 `Play` 頁：使用 `usePlay`；顯示 TeamHeader、PhaseBadge、ErrorBanner 與等待畫面（「等待老師開始」；AnswerCard 屬 003），讓 T059 通過（`client/src/pages/Play.tsx`）
+- [X] T080 [FE] 實作 `main.tsx`（`createRoot` + `BrowserRouter`）與 `App.tsx`（路由 `/` Home、`/teacher/login` TeacherLogin、`/teacher` TeacherDashboard、`/join` Join、`/play` Play，依 TECH_SPEC §10.1）。覆蓋測試：UT-UI-PLAY-01、E2E-03（`client/src/main.tsx`、`client/src/App.tsx`）
 - [ ] T081 [FE] **Phase 3 驗收**：執行 `npm test`（UT-UI-STORE-01～03、UT-UI-MSG-01、UT-UI-PHASE-01、UT-UI-LOGIN-01～02、UT-UI-SET-01～02、UT-UI-JOIN-01～06、UT-UI-DASH-01～03、UT-UI-PLAY-01～02 全部通過，Phase 1、2 測試仍通過）與 `npm run lint` 全部通過；確認 `client/` 沒有匯入 `server/` 的任何檔案（搜尋 `from '.*server/`）；依憲章原則 XI 比對 `diagrams/001-component.puml`（老師端／學生端組件、儲存、HTTP 與即時連線關係）、`diagrams/001-sequence.puml`（登入→取得目前活動→建立、登出、加入頁導向、重連與失效處理的順序）與程式碼，不一致先修正，於本任務記錄比對結果（`client/`、`diagrams/001-*.puml`）
 
 ---
