@@ -79,17 +79,31 @@ SC -x BC : 斷線／重新整理
 BC -> Svc : 該成員最後一個連線關閉 → setOnline(memberId, false)
 BC --> TC : teacher:state（成員離線）
 note right of BC : 同時推播 team:state 給該成員所屬組\n（本組其他組員看到離線）
-SC -> SC : 讀取保存的學生身分
-SC -> Svc : getTeamView(token)
-alt 身分有效
-  Svc --> SC : TeamView（原組別與暱稱）
-  SC -> BC : 即時連線 {member token}
-  BC -> Svc : setOnline(memberId, true)
-  BC --> SC : team:state（目前完整狀態）
-  BC --> TC : teacher:state（成員上線）
-  BC --> SC : team:state（推播給本組）
-else 身分失效（UNAUTHORIZED）
-  Svc --> SC : UNAUTHORIZED
-  SC -> SC : 清除身分；導向加入頁並帶入原房間碼
+alt 網路短暫斷線（頁面未重新整理）
+  SC -> BC : socket.io 自動重連 {同一 member token}\n（不先呼叫 GET /api/play/state）
+  BC -> Svc : resolveMember(token)
+  alt 身分有效
+    BC -> Svc : setOnline(memberId, true)
+    BC --> SC : team:state（目前完整狀態）
+    BC --> TC : teacher:state（成員上線）
+    BC --> SC : team:state（推播給本組）
+  else 身分失效
+    BC --> SC : connect_error UNAUTHORIZED
+    SC -> SC : 清除身分；導向加入頁並帶入原房間碼
+  end
+else 重新整理頁面
+  SC -> SC : 讀取保存的學生身分
+  SC -> Svc : getTeamView(token)
+  alt 身分有效
+    Svc --> SC : TeamView（原組別與暱稱）
+    SC -> BC : 即時連線 {member token}
+    BC -> Svc : setOnline(memberId, true)
+    BC --> SC : team:state（目前完整狀態）
+    BC --> TC : teacher:state（成員上線）
+    BC --> SC : team:state（推播給本組）
+  else 身分失效（UNAUTHORIZED）
+    Svc --> SC : UNAUTHORIZED
+    SC -> SC : 清除身分；導向加入頁並帶入原房間碼
+  end
 end
 @enduml
