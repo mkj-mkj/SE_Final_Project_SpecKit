@@ -3,6 +3,10 @@ title 001 建立活動與加入 — 組件圖
 skinparam componentStyle uml2
 left to right direction
 
+package "瀏覽器（入口）" {
+  [首頁\nHome（/）] as Home
+}
+
 package "瀏覽器（老師端）" {
   [老師登入頁\nTeacherLogin] as TLogin
   [管理頁\nTeacherDashboard\n(btn-create-session 只在無活動時顯示；teacher-logout)] as TDash
@@ -28,6 +32,9 @@ package "伺服器" {
 
 database "資料庫\n(sessions / teams / members)" as DB
 
+Home ..> TDash : 我是老師（/teacher；無老師身分時導向登入頁）
+Home ..> Join : 我是學生（/join）
+TDash ..> TLogin : 無老師身分／UNAUTHORIZED／登出時導向
 TLogin --> Http : 登入（密碼）
 TDash --> Http : 取得目前活動／建立活動／調整設定
 TDash ..> RT : 即時連線（老師身分 + sessionId）
