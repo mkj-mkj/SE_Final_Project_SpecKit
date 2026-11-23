@@ -6,9 +6,9 @@ left to right direction
 actor 老師 as T
 
 package "瀏覽器（老師端）" {
-  [管理頁\nTeacherDashboard\n(READY 題號清單，題組標示子題)] as TDash
-  [匯入表單\nImportForm\n(import-input、import-submit；\n空白或 busy 時 disabled，忙碌時文字「匯入中…」；\nHEADER_NOT_FOUND 時顯示範本格式說明)] as Form
-  [匯入摘要\nImportSummary\n(import-summary：「偵測到 N 題，其中 M 題組（共 K 子題）、L 單題」；\nimport-question-count、import-group-count、import-warning-{i})] as Sum
+  [管理頁\nTeacherDashboard\n(SETUP、READY 時顯示 ImportForm；\n有 importSummary 時顯示 ImportSummary)] as TDash
+  [匯入表單\nImportForm\n(import-input、import-submit；\n空白、busy 或送出中時 disabled，送出中文字「匯入中…」；\nHEADER_NOT_FOUND 時顯示範本格式說明)] as Form
+  [匯入摘要\nImportSummary\n(import-summary：「偵測到 N 題，其中 M 題組（共 K 子題）、L 單題」；\nimport-question-count、import-group-count、import-warning-{i}；\n題號清單：單題「第 n 題」、題組「第 n 題 題組」加子題標籤)] as Sum
   [錯誤橫幅\nErrorBanner（001，管理頁唯一一個）\n(顯示 useTeacher.error；ImportForm 不另顯示錯誤，\nHEADER_NOT_FOUND 時 ImportForm 只附範本格式說明)] as Err
   [useTeacher.importSheet\n(busy 狀態)] as Hook
 }
