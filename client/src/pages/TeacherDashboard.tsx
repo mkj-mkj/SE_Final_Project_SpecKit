@@ -1,6 +1,8 @@
-// 老師管理頁（TECH_SPEC §10.1、§10.4）：無活動時只顯示建立按鈕；有活動顯示房間碼、設定與組別
+// 老師管理頁（TECH_SPEC §10.1、§10.4）：無活動時只顯示建立按鈕；有活動顯示房間碼、匯入（SETUP／READY）、設定與組別
 import { Navigate, useNavigate } from 'react-router-dom';
 import ErrorBanner from '../components/ErrorBanner';
+import ImportForm from '../components/ImportForm';
+import ImportSummary from '../components/ImportSummary';
 import PhaseBadge from '../components/PhaseBadge';
 import RoomCode from '../components/RoomCode';
 import SettingsForm from '../components/SettingsForm';
@@ -15,7 +17,8 @@ export default function TeacherDashboard() {
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { view, error, busy, createSession, updateSettings } = useTeacher();
+  const { view, error, busy, createSession, updateSettings, importSheet } = useTeacher();
+  const canImport = view !== null && (view.session.phase === 'SETUP' || view.session.phase === 'READY');
 
   // 登出：清除身分並離開本頁（卸載時 useTeacher 會中斷 Socket）；不呼叫伺服器
   function logout() {
@@ -44,6 +47,17 @@ function Dashboard() {
       ) : (
         <>
           <RoomCode roomCode={view.session.roomCode} />
+          {(canImport || view.importSummary) && (
+            <section>
+              <h2>匯入 Guided Notes</h2>
+              {/* 匯入錯誤沿用上方唯一的 ErrorBanner（useTeacher.error） */}
+              {canImport && <ImportForm onImport={importSheet} busy={busy} />}
+              {/* 摘要來自快照，重新整理後仍會顯示（FR-023） */}
+              {view.importSummary && (
+                <ImportSummary summary={view.importSummary} questions={view.questions} />
+              )}
+            </section>
+          )}
           <section>
             <h2>活動設定</h2>
             <SettingsForm session={view.session} onSave={updateSettings} disabled={busy} />

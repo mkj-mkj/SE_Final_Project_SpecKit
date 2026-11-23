@@ -2,6 +2,7 @@
 import type {
   ErrorCode,
   FairnessMode,
+  ImportSummary,
   PublicSessionInfo,
   TeacherView,
   TeamView,
@@ -67,6 +68,14 @@ export function getSession(token: string, id: string): Promise<TeacherView> {
 export function updateSettings(token: string, id: string, input: SettingsInput): Promise<TeacherView> {
   return request(`/api/teacher/sessions/${encodeURIComponent(id)}/settings`, {
     method: 'PATCH', token, body: input,
+  });
+}
+/** 匯入 Guided Notes（002，contracts/rest-api.md）；spreadsheet 為網址或試算表 ID */
+export function importSheet(
+  token: string, sessionId: string, spreadsheet: string,
+): Promise<{ view: TeacherView; summary: ImportSummary }> {
+  return request(`/api/teacher/sessions/${encodeURIComponent(sessionId)}/import`, {
+    method: 'POST', token, body: { spreadsheet },
   });
 }
 

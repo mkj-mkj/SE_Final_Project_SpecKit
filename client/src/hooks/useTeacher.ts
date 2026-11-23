@@ -1,7 +1,7 @@
-// 老師端狀態（TECH_SPEC §10.3，001 範圍：view、error、busy、createSession、updateSettings）
+// 老師端狀態（TECH_SPEC §10.3）：001 的 view、error、busy、createSession、updateSettings；002 的 importSheet
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TeacherView } from '@quiz/shared';
+import type { ImportSummary, TeacherView } from '@quiz/shared';
 import * as api from '../api';
 import type { AppErrorView, SettingsInput } from '../api';
 import { toAppError } from '../errors';
@@ -14,6 +14,7 @@ export interface UseTeacher {
   busy: boolean;
   createSession(input: SettingsInput): Promise<void>;
   updateSettings(input: SettingsInput): Promise<void>;
+  importSheet(spreadsheet: string): Promise<ImportSummary>;
 }
 
 export function useTeacher(): UseTeacher {
@@ -91,5 +92,29 @@ export function useTeacher(): UseTeacher {
     [run, sessionId],
   );
 
-  return { view, error, busy, createSession, updateSettings };
+  /**
+   * 匯入 Guided Notes（002）：成功以回應的 view 取代本地狀態並回傳 summary；
+   * 失敗設定 error（由 TeacherDashboard 唯一的 ErrorBanner 顯示）並重新丟出，
+   * 供 ImportForm 判斷是否顯示範本格式說明。之後仍以 teacher:state 快照為準。
+   */
+  const importSheet = useCallback(async (spreadsheet: string): Promise<ImportSummary> => {
+    if (!token || !sessionId) {
+      if (!token) onUnauthorized();
+      throw toAppError({ code: token ? 'SESSION_NOT_FOUND' : 'UNAUTHORIZED', message: '尚無活動' });
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const { view: v, summary } = await api.importSheet(token, sessionId, spreadsheet);
+      if (mounted.current) setView(v);
+      return summary;
+    } catch (e) {
+      if (mounted.current) fail(e);
+      throw toAppError(e);
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }, [token, sessionId, onUnauthorized, fail]);
+
+  return { view, error, busy, createSession, updateSettings, importSheet };
 }
