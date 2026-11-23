@@ -100,7 +100,27 @@ description: "Task list for 002-guided-notes-import（依層次分 Phase：Setup
 - [X] T031 [FE] 實作 `ImportForm`（props：`onImport(spreadsheet): Promise<unknown>`、`busy: boolean`）：`import-input`、`import-submit`；輸入 trim 後為空白、`busy` 為 true、或本元件送出中 → disabled；送出中按鈕文字「匯入中…」，否則「匯入」；`onImport` 拒絕時**不**渲染 `ErrorBanner`（錯誤由 `useTeacher.error` 經 TeacherDashboard 唯一的 ErrorBanner 顯示，避免重複），只在 `code === 'HEADER_NOT_FOUND'` 時於表單下方顯示範本格式說明 4 點（contracts/ui-testids.md），下次送出時清除；不顯示模式提示，讓 T027 通過（`client/src/components/ImportForm.tsx`）
 - [X] T032 [P] [FE] 實作 `ImportSummary`（props：`summary: ImportSummary`、`questions: QuestionInfo[]`）：`import-summary` 文字固定為「偵測到 {questionCount} 題，其中 {groupCount} 題組（共 {subQuestionCount} 子題）、{singleCount} 單題」，數字分別包在 `import-question-count`、`import-group-count`（其餘數字無 testid）；下方依序列出警告 `import-warning-{i}`（顯示 message）與題號清單：單題「第 n 題」、題組「第 n 題 題組」加 `subLabels`；不顯示試算表 ID、工作表名稱、題目敘述，讓 T028 通過（`client/src/components/ImportSummary.tsx`）
 - [X] T033 [FE] 修改 `TeacherDashboard`：phase 為 SETUP 或 READY 時顯示 `ImportForm`（`onImport = importSheet`、`busy`）；`view.importSummary` 不為 null 時顯示 `ImportSummary`（`questions = view.questions`），重新整理後由快照自動顯示（FR-023）；RUNNING、ENDED 不顯示 ImportForm；不新增第二個 `ErrorBanner`，匯入錯誤沿用 001 既有、顯示 `useTeacher.error` 的那一個；不修改 `client/src/pages/Play.tsx`（學生等待畫面的題號顯示屬 003 AnswerCard）。覆蓋測試：UT-UI-DASH-01～03 仍通過、E2E-01、E2E-02（`client/src/pages/TeacherDashboard.tsx`）
-- [ ] T034 [FE] **Phase 3 驗收**：執行 `npm test`（UT-UI-IMPORT-01～04，以及 001 全部測試）與 `npm run lint` 全部通過；確認 `client/` 未匯入 `server/` 任何檔案；依憲章原則 XI 比對 `diagrams/002-component.puml`（瀏覽器端：TeacherDashboard、ImportForm 的 disabled 與「匯入中…」、ImportSummary 的固定文字、TeacherDashboard → ErrorBanner 唯一一個且 ImportForm 只顯示格式說明、useTeacher.importSheet）與 `002-sequence.puml`（老師端 busy 切換與兩段流程）與程式一致，不一致先修正（改圖後重新產生 PNG），於本任務記錄比對結果（`client/`、`diagrams/002-*.puml`）
+- [X] T034 [FE] **Phase 3 驗收**：執行 `npm test`（UT-UI-IMPORT-01～04，以及 001 全部測試）與 `npm run lint` 全部通過；確認 `client/` 未匯入 `server/` 任何檔案；依憲章原則 XI 比對 `diagrams/002-component.puml`（瀏覽器端：TeacherDashboard、ImportForm 的 disabled 與「匯入中…」、ImportSummary 的固定文字、TeacherDashboard → ErrorBanner 唯一一個且 ImportForm 只顯示格式說明、useTeacher.importSheet）與 `002-sequence.puml`（老師端 busy 切換與兩段流程）與程式一致，不一致先修正（改圖後重新產生 PNG），於本任務記錄比對結果（`client/`、`diagrams/002-*.puml`）
+  - **驗收紀錄（2026-11-23）**
+    - `npm test`：27 個測試檔、167 個測試全部通過（含 UT-UI-IMPORT-01～04、UT-UI-DASH-01～03 與 001 全部測試）。
+    - `npm run lint`：eslint 與 shared／server／client 三個 workspace 的 typecheck 皆無錯誤，未修改任何檔案。
+    - `client/` 匯入檢查：搜尋 `client/` 的 `.ts`／`.tsx`，沒有任何 `server/` 匯入；型別與錯誤訊息只來自 `@quiz/shared`。
+    - **002-component.puml（瀏覽器端）— 一致**
+      - ImportForm：`import-input`、`import-submit`；trim 後空白、`busy` 或自身送出中 → disabled；送出中顯示「匯入中…」；只在 `HEADER_NOT_FOUND` 時顯示範本格式說明 4 點，不渲染 ErrorBanner（`client/src/components/ImportForm.tsx`）。
+      - ImportSummary：`import-summary` 文字為「偵測到 N 題，其中 M 題組（共 K 子題）、L 單題」；`import-question-count`、`import-group-count`、`import-warning-{i}` 都有；不顯示試算表 ID、工作表名稱與題目敘述（`client/src/components/ImportSummary.tsx`）。
+      - ErrorBanner：管理頁只有一個，顯示 `useTeacher.error`，訊息由 `messageOf(code)` 取自 shared `MESSAGES`（`client/src/pages/TeacherDashboard.tsx`）。
+      - TeacherDashboard → ImportForm／ImportSummary／ErrorBanner 的關聯相符；ImportForm 只在 SETUP、READY 顯示；`onImport = importSheet`。
+      - useTeacher.importSheet：設定 `busy`，經 `api.importSheet` 送出 `POST …/import { spreadsheet }`；200 時以 `view` 取代狀態並回傳 `summary`；4xx／5xx 時設定 `error` 並重新丟出（`client/src/hooks/useTeacher.ts`、`client/src/api.ts`）。
+      - teacher:state 快照會整份取代 view，所以重新整理後摘要仍會顯示（FR-023）。
+    - **002-sequence.puml（老師端）— 一致**
+      - 成功流程：busy=true → POST → 200 `{ view, summary }`（或先收到 teacher:state，兩種順序都能處理）→ busy=false → 顯示摘要、題號清單與警告。
+      - 失敗流程（HEADER_NOT_FOUND）：422 → busy=false、`useTeacher.error` = HEADER_NOT_FOUND → 唯一的 ErrorBanner 顯示「找不到「題號」與「作答」表頭，請確認 Guided Notes 格式」，ImportForm 下方顯示格式說明。
+    - **002-class.puml（client 用到的型別）— 一致**：`ImportSummary`、`QuestionInfo`（含 `subLabels`）、`ParseWarning` 都取自 `@quiz/shared`，欄位與類別圖相同。
+    - **圖表修正（團隊 2026-11-23 決定，程式碼未修改）**
+      1. 組件圖原本把「READY 題號清單，題組標示子題」畫在 TeacherDashboard 上，但程式中題號清單由 ImportSummary 渲染，而且只要 `importSummary` 不為 null 就會顯示（依 T033）→ 已修正：TeacherDashboard 改為「SETUP、READY 時顯示 ImportForm；有 importSummary 時顯示 ImportSummary」，題號清單移到 ImportSummary 方塊。
+      2. 組件圖原本寫「忙碌時文字「匯入中…」」，但程式只在 ImportForm 自身送出中才顯示（依 T031）→ 已修正為「空白、busy 或送出中時 disabled，送出中文字「匯入中…」」。時序圖不需要改。
+      3. 組件圖省略了 `api.ts`，teacher:state 也畫成 BC ..> TDash 直連（實際經由 `useTeacher` 的 socket 訂閱）→ 屬於抽象層級的選擇，維持原樣。
+    - 已重新產生 `diagrams/002-component.png`；002-sequence、002-class 未變更。
 
 **Checkpoint**：前端可合併；Phase 4 待 001 Phase 4 完成後開始
 
