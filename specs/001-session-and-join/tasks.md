@@ -163,7 +163,36 @@ description: "Task list for 001-session-and-join（依層次分 Phase：Setup �
 - [X] T078 [FE] 實作 `Join` 頁：掛載時若有 `quiz.member` 先 `getPlayState(token)`——200 → `navigate('/play', { replace: true })` 且不渲染 JoinForm；401 → `clearMember()`，以原 roomCode 作為 `initialRoom`；無 token → 以 `?room=` 作為 `initialRoom`；讓 T077 通過（`client/src/pages/Join.tsx`）
 - [X] T079 [FE] 實作 `Play` 頁：使用 `usePlay`；顯示 TeamHeader、PhaseBadge、ErrorBanner 與等待畫面（「等待老師開始」；AnswerCard 屬 003），讓 T059 通過（`client/src/pages/Play.tsx`）
 - [X] T080 [FE] 實作 `main.tsx`（`createRoot` + `BrowserRouter`）與 `App.tsx`（路由 `/` Home、`/teacher/login` TeacherLogin、`/teacher` TeacherDashboard、`/join` Join、`/play` Play，依 TECH_SPEC §10.1）。覆蓋測試：UT-UI-PLAY-01、E2E-03（`client/src/main.tsx`、`client/src/App.tsx`）
-- [ ] T081 [FE] **Phase 3 驗收**：執行 `npm test`（UT-UI-STORE-01～03、UT-UI-MSG-01、UT-UI-PHASE-01、UT-UI-LOGIN-01～02、UT-UI-SET-01～02、UT-UI-JOIN-01～06、UT-UI-DASH-01～03、UT-UI-PLAY-01～02 全部通過，Phase 1、2 測試仍通過）與 `npm run lint` 全部通過；確認 `client/` 沒有匯入 `server/` 的任何檔案（搜尋 `from '.*server/`）；依憲章原則 XI 比對 `diagrams/001-component.puml`（老師端／學生端組件、儲存、HTTP 與即時連線關係）、`diagrams/001-sequence.puml`（登入→取得目前活動→建立、登出、加入頁導向、重連與失效處理的順序）與程式碼，不一致先修正，於本任務記錄比對結果（`client/`、`diagrams/001-*.puml`）
+- [X] T081 [FE] **Phase 3 驗收**：執行 `npm test`（UT-UI-STORE-01～03、UT-UI-MSG-01、UT-UI-PHASE-01、UT-UI-LOGIN-01～02、UT-UI-SET-01～02、UT-UI-JOIN-01～06、UT-UI-DASH-01～03、UT-UI-PLAY-01～02 全部通過，Phase 1、2 測試仍通過）與 `npm run lint` 全部通過；確認 `client/` 沒有匯入 `server/` 的任何檔案（搜尋 `from '.*server/`）；依憲章原則 XI 比對 `diagrams/001-component.puml`（老師端／學生端組件、儲存、HTTP 與即時連線關係）、`diagrams/001-sequence.puml`（登入→取得目前活動→建立、登出、加入頁導向、重連與失效處理的順序）與程式碼，不一致先修正，於本任務記錄比對結果（`client/`、`diagrams/001-*.puml`）
+
+  **T081 驗收紀錄（2026-11-16）**
+
+  - `npm test`：25 個測試檔、160 個測試全部通過（含 UT-UI-STORE-01～03、MSG-01、PHASE-01、LOGIN-01～02、SET-01～02、JOIN-01～06、DASH-01～03、PLAY-01～02，以及 Phase 1、2 測試）。
+  - `npm run lint`：`eslint .` 與 shared／server／client 的 `tsc --noEmit` 全部通過，未修改任何檔案。
+  - `client/` 匯入檢查：`client/src`、`client/test`、設定檔中沒有任何 `from '.*server/'`、`require`／`import()` 指向 `server/`；只透過 `@quiz/shared` 取得型別與常數。
+  - **001-component.puml 比對**（全部一致，未修改程式碼）：
+    - TeacherLogin → HTTP 登入：`LoginForm` 呼叫 `api.login` → `POST /api/teacher/login` ✓；TeacherLogin → TStore 儲存：`saveTeacher` 寫入 sessionStorage `quiz.teacher` ✓
+    - TeacherDashboard → HTTP 取得目前活動／建立／調整設定：`useTeacher` 呼叫 `getCurrentSession`、`createSession`、`updateSettings` ✓；`btn-create-session` 只在 `view === null` 且載入完成時顯示，`teacher-logout` 存在 ✓
+    - TeacherDashboard ..> 即時連線（老師身分 + sessionId）：`connectTeacher(token, sessionId)` 以 `auth: { token, sessionId }` 連線 ✓；RT ..> TDash `teacher:state`：`onState` 以整份快照取代 view ✓
+    - TeacherDashboard → TStore 讀取／登出清除：`loadTeacher`；`logout()` 呼叫 `clearTeacher` ✓（UNAUTHORIZED 時也清除，屬「清除」範圍）
+    - Join → HTTP：有身分時 `GET /api/play/state`，200 → 導向 `/play` ✓；查詢房間碼 `getPublicInfo`、加入 `join` ✓
+    - Join → MStore 讀取／儲存／失效清除：`loadMember`、`JoinForm` 的 `saveMember`（localStorage `quiz.member`）、401 時 `clearMember` ✓
+    - Play → HTTP `GET /api/play/state`：`usePlay` 的 `getPlayState` ✓；Play ..> 即時連線（學生身分）：`connectMember(token)` ✓；RT ..> Play `team:state` ✓；Play → MStore：`loadMember`／`clearMember` ✓
+    - 伺服器內部關係不屬 `client/` 範圍，本任務不比對。
+  - **001-sequence.puml 比對**（全部一致，未修改程式碼）：
+    - 登入：成功存 token 於目前分頁（sessionStorage）並導向 `/teacher` ✓；失敗 UNAUTHORIZED → `ErrorBanner` 以 `messageOf` 顯示「驗證失敗，請重新登入或加入」✓
+    - 取得目前活動：404（SESSION_NOT_FOUND）→ 顯示 `btn-create-session`，按下呼叫 `createSession({})` ✓；200 → 直接顯示 TeacherView，不顯示建立按鈕 ✓；建立後回傳 TeacherView 取代畫面 ✓
+    - 老師即時連線：有 sessionId 後才連線，帶 `{token, sessionId}`；收到 `teacher:state` 整份取代；`connect_error` UNAUTHORIZED → 清除身分並回登入頁 ✓
+    - 登出：`clearTeacher()`、導向 `/teacher/login`、卸載時 `useTeacher` 中斷 Socket，不呼叫伺服器 ✓（順序為「清除 → 導向 → 卸載時中斷」，結果與圖表相同）
+    - 加入頁已有身分：`GET /api/play/state` 有效 → `navigate('/play', {replace})`；UNAUTHORIZED → `clearMember()` 並預填原房間碼 ✓
+    - 房間碼不分大小寫：送出前 `trim().toUpperCase()` ✓；有效 → 顯示各組名稱與人數；SESSION_NOT_FOUND → 顯示錯誤 ✓
+    - 選組、暱稱 → `join(roomCode, {teamId, nickname})`；暱稱格式／重複由伺服器驗證，前端只擋空白 ✓；成功 → 存 localStorage、導向 `/play` ✓
+    - 作答頁：先 `getPlayState` 取得 TeamView 與 `me`，成功後才以 `{member token}` 連線並訂閱 `team:state` ✓
+    - 重新整理／重連：讀取保存身分 → `getPlayState` → 有效則重新連線；UNAUTHORIZED（HTTP 或 Socket `connect_error`）→ 清除身分、導向 `/join?room=<原房間碼>` ✓
+  - **圖表待確認項目與團隊決定**（程式碼不變；PNG 已用 `java -jar plantuml.jar` 重新產生）：
+    1. 網路短暫斷線時，socket.io-client 用同一組身分自動重連，不先呼叫 `GET /api/play/state`。→ **決定：補上**。`001-sequence.puml` 的「學生斷線後重連」改成 `alt 網路短暫斷線`（自動重連 → resolveMember → 有效：setOnline／推播；失效：`connect_error UNAUTHORIZED` → 清除身分、導向加入頁）與 `else 重新整理頁面`（保留原本流程）。
+    2. 組件圖原本沒有首頁 `Home`。→ **決定：畫進組件圖**。`001-component.puml` 新增「瀏覽器（入口）」套件與 `Home`，加上 `Home ..> TeacherDashboard`（/teacher，沒有老師身分時導向登入頁）、`Home ..> Join`（/join），以及配合的 `TeacherDashboard ..> TeacherLogin`（沒有老師身分、UNAUTHORIZED 或登出時導向）。
+    3. `api.getSession(token, id)` 在 001 沒有被呼叫。→ **決定：保留給後續子功能使用**；001 圖表不畫、程式碼不刪。
 
 ---
 
