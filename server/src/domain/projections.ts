@@ -1,6 +1,7 @@
 // 視圖投影（TECH_SPEC §7.8）：把活動的完整資料轉成老師或某一組看得到的視圖。全部是純函式。
 // 001：session、teams、members；002：questionInfo、TeacherView 的 questions 與 importSummary、TeamView 的 questions；
-// 003：TeacherView 的 cells、winnerTeamId、score，TeamView 的 drafts、mySubmissions、results，以及 buildResults。
+// 003：TeacherView 的 cells、winnerTeamId、score，TeamView 的 drafts、mySubmissions、results，以及 buildResults；
+// 004：buildCsvRows（結果 CSV 的資料列）。
 // 得主、順位、分數不存資料庫，一律由 ranking.ts 從送出紀錄推導。
 import { WITHDRAW_LIMIT_MS } from '@quiz/shared';
 import type {
@@ -18,6 +19,7 @@ import type {
   TeacherView,
   TeamView,
 } from '@quiz/shared';
+import type { CsvRow } from '../export/csv.js';
 import { rankSubmissions, teamScores, winnerOf } from './ranking.js';
 export interface SessionAggregate {
   session: Session;
@@ -241,4 +243,51 @@ export function buildResults(agg: SessionAggregate): Results {
     .map((t) => ({ teamId: t.id, teamName: t.name, score: lookup(scores, t.id, 0) }));
 
   return { questions, scores: scoreRows };
+}
+
+/**
+ * 結果 CSV 的資料列（TECH_SPEC §7.5、PRD E2）：每個送出（含撤回、判錯）的每個子題一列。
+ * 順位與是否得主由 ranking.ts 推導；撤回的送出不列入名次（rank 為 null、不是得主）。
+ * 排序：題號升冪 → 順位升冪（null 最後；null 之間依 serverTime、seq）→ 子題升冪。
+ */
+export function buildCsvRows(agg: SessionAggregate): CsvRow[] {
+  const byQ = submissionsByQuestion(agg);
+  const nick = nicknameMap(agg);
+  const teamName = new Map(agg.teams.map((t) => [t.id, t.name]));
+  const numberOf = new Map(agg.questions.map((q) => [q.id, q.number]));
+
+  // 每題各自排名一次：submission id → { rank, isWinner }
+  const ranked = new Map<string, { rank: number; isWinner: boolean }>();
+  for (const subs of byQ.values()) {
+    for (const r of rankSubmissions(subs)) ranked.set(r.id, { rank: r.rank, isWinner: r.isWinner });
+  }
+
+  const subs = agg.submissions
+    .filter((s) => numberOf.has(s.questionId))
+    .map((s) => ({ s, number: lookup(numberOf, s.questionId, 0), r: ranked.get(s.id) ?? null }))
+    .sort((a, b) => {
+      if (a.number !== b.number) return a.number - b.number;
+      const ra = a.r?.rank ?? null;
+      const rb = b.r?.rank ?? null;
+      if (ra !== rb) {
+        if (ra === null) return 1;
+        if (rb === null) return -1;
+        return ra - rb;
+      }
+      return a.s.serverTime - b.s.serverTime || a.s.seq - b.s.seq;
+    });
+
+  return subs.flatMap(({ s, number, r }) =>
+    s.answers.map((answer, i) => ({
+      questionNumber: number,
+      subNo: i + 1,
+      teamName: lookup(teamName, s.teamId, ''),
+      submittedBy: lookup(nick, s.memberId, ''),
+      answer,
+      serverTime: s.serverTime,
+      rank: r?.rank ?? null,
+      status: s.status,
+      isWinner: r?.isWinner ?? false,
+    })),
+  );
 }

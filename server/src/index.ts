@@ -21,7 +21,7 @@ const config = loadConfig();
  */
 function buildSheets(): Pick<AppDeps, 'sheets' | 'fakeSheets'> {
   if (config.sheetsMode === 'fake') {
-    const fake = createFakeGateway(config.fakeSheetsDir);
+    const fake = createFakeGateway(config.fakeSheetsDir, config.fakeSheetsOutDir);
     return { sheets: fake, fakeSheets: fake };
   }
   const auth = new google.auth.GoogleAuth({

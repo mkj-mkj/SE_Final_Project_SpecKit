@@ -1,10 +1,9 @@
 // Google 試算表閘道（TECH_SPEC §7.4，SHEETS_MODE=google）。
 // client 由 index.ts 以服務帳號建立後注入（憲章原則 VIII），測試以 mock client 取代、不連網。
-// 002 只實作讀取；writeCells 屬 004。
 import { AppError, type GridRange, type SheetData } from '@quiz/shared';
 import type { sheets_v4 } from 'googleapis';
 import type { SheetsGateway } from '../ports/sheetsGateway.js';
-import { quoteSheet } from './a1.js';
+import { quoteSheet, rangeA1 } from './a1.js';
 
 /** 把 Google API 錯誤轉成錯誤碼：403 → 沒有權限；404 → 找不到；其他 → 一般錯誤 */
 function toAppError(e: unknown): AppError {
@@ -75,9 +74,24 @@ export function createGoogleGateway(client: sheets_v4.Sheets): SheetsGateway {
         throw toAppError(e);
       }
     },
-    async writeCells() {
-      // 004 實作（values.batchUpdate，valueInputOption: 'RAW'）；002 不支援寫回
-      throw new AppError('SHEETS_ERROR');
+    /**
+     * 寫回（FR-06）：一次 values.batchUpdate 寫入全部儲存格。
+     * valueInputOption 為 RAW：答案以純文字寫入，不會被當成公式或自動轉成數字／日期；
+     * values API 只改儲存格的值，不改格式與合併（PRD §8 第 9 點）。沒有寫入時不呼叫 API。
+     */
+    async writeCells(spreadsheetId, writes) {
+      if (writes.length === 0) return;
+      try {
+        await client.spreadsheets.values.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            valueInputOption: 'RAW',
+            data: writes.map((w) => ({ range: rangeA1(w.sheetTitle, w.a1), values: [[w.value]] })),
+          },
+        });
+      } catch (e) {
+        throw toAppError(e);
+      }
     },
   };
 }

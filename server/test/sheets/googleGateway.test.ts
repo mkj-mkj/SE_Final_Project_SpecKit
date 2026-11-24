@@ -1,10 +1,14 @@
-// UT-GW-01、UT-GW-03（TEST_SPEC §5.2）：Google 試算表閘道。以 mock client 取代 googleapis，不連網。
+// UT-GW-01、UT-GW-02、UT-GW-03（TEST_SPEC §5.2）：Google 試算表閘道。以 mock client 取代 googleapis，不連網。
 import { AppError } from '@quiz/shared';
 import type { sheets_v4 } from 'googleapis';
 import { describe, expect, it, vi } from 'vitest';
 import { createGoogleGateway } from '../../src/sheets/googleGateway.js';
 
-function mockClient(opts: { get?: () => Promise<unknown>; batchGet?: () => Promise<unknown> }) {
+function mockClient(opts: {
+  get?: () => Promise<unknown>;
+  batchGet?: () => Promise<unknown>;
+  batchUpdate?: () => Promise<unknown>;
+}) {
   const get = vi.fn(
     opts.get ??
       (async () => ({
@@ -31,8 +35,9 @@ function mockClient(opts: { get?: () => Promise<unknown>; batchGet?: () => Promi
         },
       })),
   );
-  const client = { spreadsheets: { get, values: { batchGet } } } as unknown as sheets_v4.Sheets;
-  return { client, get, batchGet };
+  const batchUpdate = vi.fn(opts.batchUpdate ?? (async () => ({ data: {} })));
+  const client = { spreadsheets: { get, values: { batchGet, batchUpdate } } } as unknown as sheets_v4.Sheets;
+  return { client, get, batchGet, batchUpdate };
 }
 
 describe('sheets/googleGateway', () => {
@@ -74,5 +79,39 @@ describe('sheets/googleGateway', () => {
       expect(err).toBeInstanceOf(AppError);
       expect((err as AppError).code).toBe(code);
     }
+  });
+
+  it("UT-GW-02 writeCells → values.batchUpdate 一次，valueInputOption 'RAW'，range 為 '學習單'!G5 格式；空陣列不呼叫；403 → SHEETS_PERMISSION_DENIED", async () => {
+    const { client, batchUpdate } = mockClient({});
+    const gw = createGoogleGateway(client);
+    await gw.writeCells('sid', [
+      { sheetTitle: '學習單', a1: 'G5', value: '（1）CPU' },
+      { sheetTitle: '學習單', a1: 'G11', value: '=1+1' },
+    ]);
+    expect(batchUpdate).toHaveBeenCalledTimes(1);
+    expect(batchUpdate).toHaveBeenCalledWith({
+      spreadsheetId: 'sid',
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: [
+          { range: "'學習單'!G5", values: [['（1）CPU']] },
+          { range: "'學習單'!G11", values: [['=1+1']] },
+        ],
+      },
+    });
+
+    await gw.writeCells('sid', []);
+    expect(batchUpdate).toHaveBeenCalledTimes(1);
+
+    const denied = mockClient({
+      batchUpdate: async () => {
+        throw Object.assign(new Error('HTTP 403'), { code: 403 });
+      },
+    });
+    const err = await createGoogleGateway(denied.client)
+      .writeCells('sid', [{ sheetTitle: '學習單', a1: 'G5', value: 'x' }])
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect((err as AppError).code).toBe('SHEETS_PERMISSION_DENIED');
   });
 });

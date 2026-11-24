@@ -1,4 +1,4 @@
-// 老師 API（TECH_SPEC §8.1；001 範圍＋002 匯入＋003 開始、結束、重新開始）。只做 zod 驗證與轉換，業務規則在 SessionService。
+// 老師 API（TECH_SPEC §8.1；001 範圍＋002 匯入＋003 開始、結束、重新開始＋004 判錯、寫回、還原、CSV）。只做 zod 驗證與轉換，業務規則在 SessionService。
 import { AppError } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -86,6 +86,43 @@ export function teacherRoutes(auth: AuthService, service: SessionService): Route
     '/sessions/:id/reset',
     wrap((req, res) => {
       res.status(200).json(service.reset(String(req.params.id)));
+    }),
+  );
+
+  // 結果與匯出（004）：判錯回傳最新 TeacherView；寫回、還原、CSV 的 Google Sheets 錯誤交給 errorHandler（403／404／502）
+  r.post(
+    '/sessions/:id/questions/:qid/reject-winner',
+    wrap((req, res) => {
+      res.status(200).json(service.rejectWinner(String(req.params.id), String(req.params.qid)));
+    }),
+  );
+
+  r.post(
+    '/sessions/:id/export',
+    wrap(async (req, res) => {
+      res.status(200).json(await service.exportToSheet(String(req.params.id)));
+    }),
+  );
+
+  r.post(
+    '/sessions/:id/restore',
+    wrap(async (req, res) => {
+      res.status(200).json(await service.restoreSheet(String(req.params.id)));
+    }),
+  );
+
+  // 檔名含房間碼與輪次：results-<roomCode>-r<round>.csv
+  r.get(
+    '/sessions/:id/export.csv',
+    wrap((req, res) => {
+      const id = String(req.params.id);
+      const csv = service.exportCsv(id);
+      const { roomCode, round } = service.getTeacherView(id).session;
+      res
+        .status(200)
+        .type('text/csv; charset=utf-8')
+        .set('Content-Disposition', `attachment; filename="results-${roomCode}-r${round}.csv"`)
+        .send(csv);
     }),
   );
 

@@ -18,6 +18,7 @@ export interface Config {
   sheetsMode: 'fake' | 'google';
   googleCredentials: string;
   fakeSheetsDir: string;
+  fakeSheetsOutDir: string; // fake 模式寫回結果輸出位置（固定為 data/fake-sheets，004）
 }
 
 const envSchema = z.object({
@@ -56,6 +57,7 @@ export function loadConfig(): Config {
     sheetsMode: env.SHEETS_MODE,
     googleCredentials: fromRoot(env.GOOGLE_APPLICATION_CREDENTIALS),
     fakeSheetsDir: fromRoot(env.FAKE_SHEETS_DIR),
+    fakeSheetsOutDir: fromRoot('./data/fake-sheets'),
   };
   if (config.sheetsMode === 'google' && !existsSync(config.googleCredentials)) {
     console.error(`設定錯誤：SHEETS_MODE=google，但找不到服務帳號金鑰檔 ${config.googleCredentials}`);

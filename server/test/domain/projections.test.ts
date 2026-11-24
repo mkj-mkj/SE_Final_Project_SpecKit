@@ -1,12 +1,15 @@
 import type { AnswerSlot, Draft, Member, Phase, Question, Session, Submission, SubmissionStatus, Team } from '@quiz/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  buildCsvRows,
   buildResults,
   projectTeacherView,
   projectTeamView,
   questionInfo,
   type SessionAggregate,
 } from '../../src/domain/projections.js';
+import { makeTestService } from '../helpers/makeTestService.js';
+import { seedRunning } from '../helpers/seed.js';
 
 const NOW = 1_700_000_000_000;
 
@@ -307,6 +310,48 @@ describe('projections（003 作答與結果）', () => {
     expect(buildResults(agg).questions.map((q) => [q.winner, q.ranking.length])).toEqual([
       [null, 0],
       [null, 0],
+    ]);
+  });
+});
+
+describe('projections（004 CSV）', () => {
+  it('UT-PROJ-09 buildCsvRows：題組送出 → 每個子題一列（subNo 1、2，組名與送出者正確）', async () => {
+    const t = makeTestService();
+    const { sessionId, tokens, q } = await seedRunning(t);
+    t.service.submit(tokens[0]![0]!, q[1]!, ['CPU', '作業系統']);
+    const rows = buildCsvRows(t.service.loadAggregate(sessionId));
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => [r.questionNumber, r.subNo, r.answer])).toEqual([
+      [1, 1, 'CPU'],
+      [1, 2, '作業系統'],
+    ]);
+    for (const r of rows) {
+      expect(r).toMatchObject({ teamName: '第 1 組', submittedBy: 'T1M1', rank: 1, status: 'active', isWinner: true });
+    }
+  });
+
+  it('UT-CSV-07 打亂順序輸入（經 buildCsvRows）→ 題號 → 順位（null 最後）→ 子題', async () => {
+    const t = makeTestService();
+    const { sessionId, tokens, q } = await seedRunning(t);
+    // 第 3 組送第 3 題後撤回 → 第 2 組送第 3 題 → 第 1 組送第 1 題（題組）→ 第 1 組送第 3 題
+    const w = t.service.submit(tokens[2]![0]!, q[3]!, ['9']);
+    t.clock.advance(100);
+    t.service.withdraw(tokens[2]![0]!, w.submissionId);
+    t.clock.advance(100);
+    t.service.submit(tokens[1]![0]!, q[3]!, ['1']);
+    t.clock.advance(100);
+    t.service.submit(tokens[0]![0]!, q[1]!, ['CPU', '作業系統']);
+    t.clock.advance(100);
+    t.service.submit(tokens[0]![0]!, q[3]!, ['0']);
+    t.service.end(sessionId);
+
+    const rows = buildCsvRows(t.service.loadAggregate(sessionId));
+    expect(rows.map((r) => [r.questionNumber, r.subNo, r.teamName, r.rank, r.status, r.isWinner])).toEqual([
+      [1, 1, '第 1 組', 1, 'active', true],
+      [1, 2, '第 1 組', 1, 'active', true],
+      [3, 1, '第 2 組', 1, 'active', true],
+      [3, 1, '第 1 組', 2, 'active', false],
+      [3, 1, '第 3 組', null, 'withdrawn', false],
     ]);
   });
 });

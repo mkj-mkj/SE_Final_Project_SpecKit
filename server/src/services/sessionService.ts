@@ -1,6 +1,6 @@
 // 活動服務（TECH_SPEC §7.9）。001：createSession、getCurrentSession、getTeacherView、
 // updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline；002：importSheet；
-// 003：start、end、reset、updateDraft、submit（純速度）。
+// 003：start、end、reset、updateDraft、submit（純速度）；004：rejectWinner、exportToSheet、restoreSheet、exportCsv。
 //
 // 寫入一律在單一同步交易（withTransaction）中完成；排程與推播等副作用只在 COMMIT 之後執行（research R-01）。
 // domain 與 service 不直接呼叫 Date.now()、setTimeout、Math.random()，一律用注入的 clock、scheduler、ids。
@@ -26,6 +26,7 @@ import {
   type Submission,
   type TeacherView,
   type TeamView,
+  type CellWrite,
   validateAnswers,
   WITHDRAW_LIMIT_MS,
 } from '@quiz/shared';
@@ -33,8 +34,9 @@ import { z } from 'zod';
 import { withTransaction } from '../db/db.js';
 import type { Repo } from '../db/repo.js';
 import { assertPhase, nextPhase } from '../domain/phase.js';
-import { projectTeacherView, projectTeamView, type SessionAggregate } from '../domain/projections.js';
-import { teamScores } from '../domain/ranking.js';
+import { buildResultsCsv } from '../export/csv.js';
+import { buildCsvRows, projectTeacherView, projectTeamView, type SessionAggregate } from '../domain/projections.js';
+import { teamScores, winnerOf } from '../domain/ranking.js';
 import { assignOrderKeys, nextOrderKey, sortFairCandidates } from '../domain/settlement.js';
 import type { Clock } from '../ports/clock.js';
 import type { IdGen } from '../ports/ids.js';
@@ -42,6 +44,7 @@ import type { Scheduler } from '../ports/scheduler.js';
 import type { SheetsGateway } from '../ports/sheetsGateway.js';
 import type { Broadcaster } from '../realtime/broadcaster.js';
 import { parseSpreadsheetInput } from '../sheets/a1.js';
+import { buildExportWrites, buildRestoreWrites } from '../sheets/exporter.js';
 import { parseGuidedNotes, summarize } from '../sheets/parser.js';
 
 export interface ServiceDeps {
@@ -329,6 +332,64 @@ export class SessionService {
       after(() => broadcaster.publish(sessionId));
     });
     return this.getTeacherView(sessionId);
+  }
+
+  /**
+   * 老師判錯（PRD E5、TECH_SPEC §7.9）：把該題目前得主的送出標為 rejected，只改 status。
+   * rejected 保留名次（orderKey 不變）但不能是得主，所以下一個有效送出自動遞補、原得主自動扣分，
+   * 得主與分數一律由 ranking.ts（winnerOf／teamScores）推導，不另外儲存（TECH_SPEC §7.6）。
+   * 搶答中與已結束都可判錯；沒有得主（無人送出、全部判錯或撤回、公平模式視窗尚未結算）→ NO_WINNER。
+   * 整段在單一同步交易內完成，並發的判錯不會產生兩位得主；COMMIT 後推播給老師與全部組。
+   */
+  rejectWinner(sessionId: string, questionId: string): TeacherView {
+    const { repo, broadcaster } = this.deps;
+    this.runTx((after) => {
+      const session = this.requireSession(sessionId);
+      assertPhase(session.phase, 'rejectWinner');
+      const q = this.requireQuestion(sessionId, questionId);
+      const winner = winnerOf(repo.listSubmissionsByQuestion(q.id));
+      if (!winner) throw new AppError('NO_WINNER');
+      repo.updateSubmission(winner.id, { status: 'rejected' });
+      after(() => broadcaster.publish(sessionId));
+    });
+    return this.getTeacherView(sessionId);
+  }
+
+  /**
+   * 寫回 Google Sheets（FR-06、PRD §8 第 9 點）：只有已結束可寫回。
+   * 每題最終得主（winnerOf，已反映判錯與撤回）的答案寫入匯入時記錄的作答格，位置只來自 answer_slots；
+   * 無得主的題目不寫。沒有任何寫入時不呼叫試算表 API。不推播、不寫資料庫。
+   */
+  async exportToSheet(sessionId: string): Promise<{ updatedCells: number; writes: CellWrite[] }> {
+    const agg = this.loadAggregate(sessionId);
+    assertPhase(agg.session.phase, 'export');
+    const spreadsheetId = agg.session.spreadsheetId;
+    if (!spreadsheetId) throw new AppError('INVALID_PHASE');
+    const winners = new Map<string, Submission>();
+    for (const [questionId, subs] of groupByQuestion(agg.submissions)) {
+      const w = winnerOf(subs);
+      if (w) winners.set(questionId, w);
+    }
+    const writes = buildExportWrites(agg.slots, agg.questions, winners);
+    if (writes.length > 0) await this.deps.sheets.writeCells(spreadsheetId, writes);
+    return { updatedCells: writes.length, writes };
+  }
+
+  /** 還原（PRD §8 第 10 點）：等待開始或已結束時，把所有作答格恢復成匯入時的原始值。不推播、不寫資料庫。 */
+  async restoreSheet(sessionId: string): Promise<{ updatedCells: number }> {
+    const session = this.requireSession(sessionId);
+    assertPhase(session.phase, 'restore');
+    if (!session.spreadsheetId) throw new AppError('INVALID_PHASE');
+    const writes = buildRestoreWrites(this.deps.repo.listSlotsBySession(sessionId));
+    if (writes.length > 0) await this.deps.sheets.writeCells(session.spreadsheetId, writes);
+    return { updatedCells: writes.length };
+  }
+
+  /** 結果 CSV（PRD E2）：只有已結束可下載；每個送出（含撤回、判錯）的每個子題一列。 */
+  exportCsv(sessionId: string): string {
+    const agg = this.loadAggregate(sessionId);
+    assertPhase(agg.session.phase, 'csv');
+    return buildResultsCsv(buildCsvRows(agg));
   }
 
   // ---------- 學生 ----------
