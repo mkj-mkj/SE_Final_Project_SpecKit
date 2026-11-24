@@ -1,0 +1,82 @@
+@startuml 003-component
+scale max 4000 width
+title 003 搶答進行 — 組件圖（依 TECH_SPEC v1.6）
+skinparam componentStyle uml2
+
+actor 老師 as T
+actor "學生（組員）" as S
+
+package "瀏覽器（老師端）" {
+  [管理頁\nTeacherDashboard\n(RUNNING 時顯示 StatusGrid)] as TDash
+  [控制列 ControlBar\n(btn-start／btn-end／btn-reset；\n依階段只有一個可按)] as Ctrl
+  [即時狀態表 StatusGrid\n(status-grid、status-cell-{q}-{team}、question-state-{q}；\n— ／答案·送出者·HH:mm:ss.SSS·#順位或「判定中」／★ 得主／已撤回／✗ 判錯)] as Grid
+  [useTeacher\n(start、end、reset)] as UT
+  [format.ts\n(formatTime、formatAnswers「（1）A／（2）B」)] as FmtT
+  [useServerClock\n(以 serverNow 校正倒數)] as ClockT
+}
+
+package "瀏覽器（學生端）" {
+  [作答頁 Play\n(搶答畫面)] as Play
+  [作答卡 AnswerCard\n(answer-input-{q}-{sub}、btn-submit-{q}、\nsubmitted-{q}、btn-withdraw-{q}、withdraw-countdown-{q})] as Card
+  [usePlay\n(setDraft 300 ms debounce、submit、withdraw)] as UP
+  [useServerClock\n(撤回倒數)] as ClockS
+}
+
+package "伺服器" {
+  [HTTP 路由\nteacherRoutes：POST start／end／reset\nplayRoutes：PUT drafts/:qid、\nPOST submissions、POST submissions/:id/withdraw] as Http
+  [搶答服務\nSessionService\n(start、end、reset、updateDraft、\nsubmit、withdraw、settleWindow、recover)] as Svc
+  [階段規則\ndomain/phase\n(start: READY；end: RUNNING；reset: ENDED；\ndraft／submit／withdraw: RUNNING)] as Phase
+  package "判定（domain）" {
+    [排名 ranking\n(orderSubmissions、rankSubmissions、\nwinnerOf、teamScores)] as Rank
+    [結算 settlement\n(sortFairCandidates、assignOrderKeys、\nnextOrderKey)] as Settle
+  }
+  [視圖投影\ndomain/projections\n(projectTeacherView、projectTeamView、\nbuildResults；TeamView 只含本組)] as Proj
+  [驗證\nshared/validation\n(validateAnswers：trim、1–200 字、題組完整)] as Val
+  [排程器 Scheduler\n(schedule／cancel `window:{qid}`)] as Sched
+  [時鐘 Clock\n(serverTime 唯一來源)] as Clock
+  [啟動恢復\nboot/recover\n(過期視窗立即結算、未到期重新排程、\nonline 重設)] as Recover
+  package "即時推播" {
+    [Broadcaster\n(publish(sessionId, scope))] as BC
+    [老師 room\nteacher:{sessionId}\n事件 teacher:state = TeacherView] as RoomT
+    [各組 room\nteam:{teamId}\n事件 team:state = 該組 TeamView] as RoomG
+  }
+  [資料存取 Repo\n(drafts、submissions、seq、\nquestions.state／window_ends_at)] as Repo
+}
+
+database "資料庫\n(sessions / questions / drafts / submissions；\n唯一索引 uq_sub_team_q_live)" as DB
+
+T --> Ctrl : 開始／結束／重新開始
+T --> Grid : 即時檢視
+TDash --> Ctrl
+TDash --> Grid
+Ctrl --> UT
+Grid --> FmtT
+Grid --> ClockT : 視窗倒數「判定中 x.x s」
+UT --> Http : REST 指令
+
+S --> Card : 輸入草稿、送出、撤回
+Play --> Card
+Card --> UP
+Card --> ClockS : 「撤回（n 秒）」
+UP --> Http : REST 指令
+
+Http --> Svc
+Svc --> Phase : assertPhase
+Svc --> Val : validateAnswers
+Svc --> Clock : now()
+Svc --> Rank : 得主、分數（衍生）
+Svc --> Settle : 名次鍵、公平排序
+Settle ..> Rank : 分數來自 teamScores
+Svc --> Sched : 開視窗 schedule／撤回或結束 cancel
+Sched --> Svc : 到期 → settleWindow(qid)
+Recover --> Svc : recover()（index.ts 啟動時、listen 前）
+Svc --> Repo : 單一同步交易
+Repo --> DB
+Svc --> BC : publish（草稿只發本組）
+BC --> Proj : 載入 aggregate 後投影
+Proj --> Rank
+BC --> RoomT
+BC --> RoomG
+RoomT ..> TDash : teacher:state
+RoomG ..> Play : team:state（不含他組資料、rank、isWinner、score、state、windowEndsAt）
+@enduml

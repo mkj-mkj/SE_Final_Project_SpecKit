@@ -1,0 +1,274 @@
+@startuml 003-class
+scale max 4000 width
+title 003 搶答進行 — 類別圖（依 TECH_SPEC v1.6）
+hide empty members
+skinparam nodesep 20
+skinparam ranksep 40
+
+package "列舉" {
+  enum Phase {
+    SETUP
+    READY
+    RUNNING
+    ENDED
+  }
+  enum FairnessMode {
+    speed
+    fair
+  }
+  enum QuestionState {
+    open
+    window
+    settled
+  }
+  enum SubmissionStatus {
+    active
+    withdrawn
+    rejected
+  }
+}
+
+package "實體" {
+  class Session {
+    +id: string
+    +roomCode: string
+    +phase: Phase
+    +fairnessMode: FairnessMode
+    +windowSec: number
+    +round: number
+    +startedAt: number | null
+    +endedAt: number | null
+  }
+  class Question {
+    +id: string
+    +sessionId: string
+    +number: number
+    +isGroup: boolean
+    +subCount: number
+    +state: QuestionState
+    +windowEndsAt: number | null
+  }
+  class Team {
+    +id: string
+    +sessionId: string
+    +index: number
+    +name: string
+  }
+  class Member {
+    +id: string
+    +teamId: string
+    +nickname: string
+    +token: string
+  }
+  class Draft {
+    +teamId: string
+    +questionId: string
+    +answers: string[]
+    +updatedBy: string
+    +updatedAt: number
+  }
+  class Submission {
+    +id: string
+    +sessionId: string
+    +questionId: string
+    +teamId: string
+    +memberId: string
+    +answers: string[]
+    +serverTime: number
+    +seq: number
+    +status: SubmissionStatus
+    +orderKey: number | null
+    +withdrawnAt: number | null
+  }
+  class RankedSubmission {
+    +rank: number
+    +isWinner: boolean
+  }
+}
+
+package "視圖（投影結果）" {
+  class TeacherCell {
+    +questionId: string
+    +teamId: string
+    +submission: null | {id, answers, submittedBy,\n serverTime, status, rank: number | null, isWinner}
+  }
+  class TeacherView {
+    +session: Session
+    +questions: (QuestionInfo & {state, windowEndsAt, winnerTeamId})[]
+    +teams: (Team & {score, members})[]
+    +cells: TeacherCell[]
+    +importSummary: ImportSummary | null
+    +serverNow: number
+  }
+  class TeamView {
+    +session: {roomCode, phase, round}
+    +team: {id, name, members}
+    +questions: QuestionInfo[]
+    +drafts: Record<questionId, {answers, updatedBy, updatedAt}>
+    +mySubmissions: Record<questionId, {id, answers, submittedBy,\n serverTime, status, withdrawableUntil}>
+    +results: Results | null
+    +serverNow: number
+  }
+  note right of TeamView
+    FR-10：phase ≠ ENDED 時不得含
+    rank、isWinner、score(s)、state、
+    windowEndsAt、winnerTeamId 與他組資料；
+    results 只有 ENDED 時非 null
+  end note
+  class Results {
+    +questions: {questionId, number, isGroup, subLabels,\n winner, ranking[]}[]
+    +scores: {teamId, teamName, score}[]
+  }
+  class QuestionInfo {
+    +id: string
+    +number: number
+    +isGroup: boolean
+    +subCount: number
+    +subLabels: string[]
+  }
+}
+
+package "domain 函式" {
+  class ranking <<module>> {
+    +orderSubmissions(subs: Submission[]): Submission[]
+    +rankSubmissions(subs: Submission[]): RankedSubmission[]
+    +winnerOf(subs: Submission[]): Submission | null
+    +teamScores(teams: Team[], subsByQuestion: Map<string, Submission[]>): Map<string, number>
+  }
+  note bottom of ranking
+    排除 withdrawn；orderKey 升冪（null 最後）
+    → serverTime → seq；得主＝第一筆
+    status=active 且 orderKey≠null
+  end note
+  class settlement <<module>> {
+    +sortFairCandidates(cands: Submission[], scores: Map<string, number>): Submission[]
+    +assignOrderKeys(sorted: Submission[], startAt: number): Map<string, number>
+    +nextOrderKey(subs: Submission[]): number
+  }
+  note bottom of settlement
+    公平排序：分數升冪 → serverTime → seq
+    nextOrderKey＝max(orderKey)+1，沒有則 1
+  end note
+  class projections <<module>> {
+    +questionInfo(q: Question, slots: AnswerSlot[]): QuestionInfo
+    +projectTeacherView(agg: SessionAggregate, now: number): TeacherView
+    +projectTeamView(agg: SessionAggregate, teamId: string, now: number): TeamView
+    +buildResults(agg: SessionAggregate): Results
+  }
+  class phase <<module>> {
+    +assertPhase(phase: Phase, action: Action): void
+    +nextPhase(phase: Phase, action): Phase
+  }
+  class validation <<module>> {
+    +validateAnswers(answers: string[], subCount: number, isGroup: boolean): string[]
+  }
+}
+
+package "ports" {
+  interface Clock {
+    +now(): number
+  }
+  interface Scheduler {
+    +schedule(key: string, at: number, fn: () => void): void
+    +cancel(key: string): void
+    +cancelAll(): void
+  }
+  interface Broadcaster {
+    +publish(sessionId: string, scope?: PublishScope): void
+  }
+}
+
+class SessionAggregate {
+  +session: Session
+  +questions: Question[]
+  +teams: Team[]
+  +members: Member[]
+  +drafts: Draft[]
+  +submissions: Submission[]
+  +onlineMemberIds: Set<string>
+  ...（slots、importSummary）
+}
+
+class Repo {
+  +upsertDraft(d: Draft): void
+  +deleteDraft(teamId: string, questionId: string): void
+  +listDrafts(sessionId: string): Draft[]
+  +deleteDraftsBySession(sessionId: string): void
+  +nextSeq(): number
+  +insertSubmission(s: Submission): void
+  +getSubmission(id: string): Submission | null
+  +updateSubmission(id: string, patch: {status?, orderKey?, withdrawnAt?}): void
+  +listSubmissions(sessionId: string): Submission[]
+  +listSubmissionsByQuestion(questionId: string): Submission[]
+  +deleteSubmissionsBySession(sessionId: string): void
+  +getQuestion(id: string): Question | null
+  +updateQuestionState(id: string, state: QuestionState, windowEndsAt: number | null): void
+  +resetQuestionStates(sessionId: string): void
+  +listSessionsByPhase(phase: Phase): Session[]
+}
+note bottom of Repo
+  方法名稱依 specs/003 plan（data-model §4）；
+  insertSubmission 唯一索引衝突 → AppError('ALREADY_SUBMITTED')；
+  nextSeq 嚴格遞增（記憶體計數與 MAX(seq) 取大者 +1）
+end note
+
+class SessionService {
+  +loadAggregate(sessionId: string): SessionAggregate
+  +start(sessionId: string): TeacherView
+  +end(sessionId: string): TeacherView
+  +reset(sessionId: string): TeacherView
+  +updateDraft(memberToken: string, questionId: string, answers: string[]): void
+  +submit(memberToken: string, questionId: string, answers: string[]): {submissionId, serverTime, withdrawableUntil}
+  +withdraw(memberToken: string, submissionId: string): void
+  +settleWindow(questionId: string): void
+  +recover(): void
+}
+class recover <<boot/recover>> {
+  +recoverOnBoot(service: SessionService): void
+  index.ts 於 listen 前呼叫（service 取自 serviceOf(app)）
+}
+
+Session "1" o-- "1..*" Question
+Session "1" o-- "2..*" Team
+Team "1" o-- "0..*" Member
+Team "1" o-- "0..*" Draft
+Question "1" o-- "0..*" Draft
+Question "1" o-- "0..*" Submission
+Team "1" o-- "0..*" Submission
+Member "1" -- "0..*" Submission : 送出者
+RankedSubmission --|> Submission
+Session --> Phase
+Session --> FairnessMode
+Question --> QuestionState
+Submission --> SubmissionStatus
+
+TeacherView "1" *-- "0..*" TeacherCell
+TeamView "1" o-- "0..1" Results
+TeamView "1" *-- "0..*" QuestionInfo
+
+ranking ..> RankedSubmission : 產生
+settlement ..> Submission : 讀取
+projections ..> ranking : 名次、得主、分數
+projections ..> TeacherView : 產生
+projections ..> TeamView : 產生（只含本組）
+projections ..> Results : 產生
+projections ..> SessionAggregate : 讀取
+
+SessionService --> Repo : 注入
+SessionService --> Clock : 注入
+SessionService --> Scheduler : 注入
+SessionService --> Broadcaster : 注入
+SessionService ..> phase
+SessionService ..> validation
+SessionService ..> ranking : teamScores、winnerOf
+SessionService ..> settlement : nextOrderKey、sortFairCandidates、assignOrderKeys
+SessionService ..> Submission : 建立／撤回
+SessionService ..> Draft : upsert／刪除
+Scheduler ..> SessionService : window:{qid} 到期 → settleWindow
+recover ..> SessionService
+
+' 版面：以隱藏連線讓各區塊縱向排列
+Phase -[hidden]down- Session
+SessionService -[hidden]down- ranking
+ranking -[hidden]down- TeacherView
+@enduml

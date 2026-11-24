@@ -1,0 +1,93 @@
+@startuml 003-sequence
+title 003 搶答進行 — 時序圖（依 TECH_SPEC v1.6）
+actor "第1組成員" as A
+actor "第2組成員" as B
+participant "學生端\n(AnswerCard / usePlay)" as SC
+participant "HTTP 路由" as Http
+participant "SessionService" as Svc
+participant "ranking／settlement" as Dom
+participant "Scheduler" as Sch
+database "資料庫" as DB
+participant "Broadcaster" as BC
+participant "老師端\n(StatusGrid)" as TC
+
+== 一、純速度模式：送出與推播 ==
+A -> SC : 第 3 題輸入「0」，按「送出」
+SC -> Http : POST /api/play/submissions { questionId, answers }
+Http -> Svc : submit(token, qid, answers)
+group 單一同步交易
+  Svc -> Svc : resolveMember；assertPhase(phase,'submit')：RUNNING\n否則 INVALID_PHASE
+  Svc -> Svc : 題目屬於本活動（否則 QUESTION_NOT_FOUND）\nvalidateAnswers：格數、trim、1–200 字、題組完整
+  Svc -> DB : 本組該題已有 active／rejected？→ ALREADY_SUBMITTED
+  Svc -> Svc : now = clock.now()（t）
+  Svc -> DB : seq = 下一個序號
+  Svc -> Dom : nextOrderKey(該題全部送出) → 1
+  Svc -> DB : 新增 Submission(active, orderKey=1)；q.state=settled；刪除本組草稿
+end
+Svc -> BC : publish(sessionId)（全部）
+BC -> Dom : projectTeacherView → rankSubmissions／winnerOf
+BC --> TC : teacher:state（第1組 ★ 得主 #1，< 500 ms）
+BC --> SC : team:state 給第1組（mySubmissions：已送出、withdrawableUntil=t+10000）
+BC --> SC : team:state 給第2組（不含第1組任何資訊）
+Svc --> Http : { submissionId, serverTime: t, withdrawableUntil: t+10000 }
+Http --> SC : 201
+SC -> A : 「已送出 HH:mm:ss」、「撤回（10 秒）」倒數
+B -> Http : POST submissions（t+80 ms，第 3 題）
+Http -> Svc : submit
+Svc -> Dom : nextOrderKey → 2
+Svc -> DB : 新增 Submission(orderKey=2)
+Svc -> BC : publish
+BC --> TC : teacher:state（第2組 #2）
+
+== 二、公平模式：視窗結算（W=3，第1組 2 分、第2組 0 分） ==
+A -> Http : POST submissions（t=0，第 4 題）
+Http -> Svc : submit
+Svc -> DB : q.state=open → window；windowEndsAt=3000；\n新增 Submission(orderKey=null)
+Svc -> Sch : schedule("window:q4", 3000, settleWindow)
+Svc -> BC : publish
+BC --> TC : teacher:state（第4題「判定中 3.0 s」倒數）
+B -> Http : POST submissions（t=1000，第 4 題）
+Http -> Svc : submit
+Svc -> DB : q.state=window → 新增 Submission(orderKey=null)
+Svc -> BC : publish
+Sch -> Svc : 到期回呼（t=3000）→ 依 (windowEndsAt, 題號) 對已到期視窗逐題 settleWindow(q4)
+group 單一同步交易
+  Svc -> DB : 讀題目；state≠window → return（冪等）
+  Svc -> DB : cands = 該題 active 且 orderKey=null
+  Svc -> Dom : teamScores（結算當下已結算題目）→ 第1組=2、第2組=0
+  Svc -> Dom : sortFairCandidates → [第2組, 第1組]
+  Svc -> Dom : assignOrderKeys(sorted, nextOrderKey) → 第2組=1、第1組=2
+  Svc -> DB : 寫入 orderKey；state=settled；windowEndsAt=null
+end
+Svc -> BC : publish
+BC --> TC : teacher:state（第2組 ★ 得主、第1組 #2）
+note over Svc, Sch
+  多題同時到期（排程回呼依序呼叫 settleWindow）、或老師按「結束搶答」時，
+  依 (windowEndsAt, 題號) 順序逐題 settleWindow，
+  前一題結果影響後一題分數；end 會 cancel 所有視窗後才 phase=ENDED
+end note
+
+== 三、撤回後遞補（純速度模式，第1組為第 3 題得主、第2組 #2） ==
+A -> SC : 送出後 5 秒內按「撤回（5 秒）」
+SC -> Http : POST /api/play/submissions/:id/withdraw
+Http -> Svc : withdraw(token, submissionId)
+group 單一同步交易
+  Svc -> Svc : assertPhase：RUNNING；送出屬於本組（否則 SUBMISSION_NOT_FOUND）
+  Svc -> Svc : status=active（否則 INVALID_STATE）；\nnow − serverTime ≤ 10000（否則 WITHDRAW_WINDOW_EXPIRED）
+  Svc -> DB : status=withdrawn；withdrawnAt=now
+  alt 題目 state=window 且已無 active 候選
+    Svc -> DB : state=open；windowEndsAt=null
+    Svc -> Sch : cancel("window:{qid}")
+  end
+end
+Svc -> BC : publish
+BC -> Dom : rankSubmissions：排除 withdrawn → 第2組 rank 1；\nwinnerOf → 第2組；teamScores 重算
+BC --> TC : teacher:state（第1組「已撤回」、第2組 ★ 得主）
+BC --> SC : team:state 給第1組（status=withdrawn → 作答卡可編輯並帶入原答案）
+BC --> SC : team:state 給第2組（只有本組已送出，看不到得主變化）
+Http --> SC : 204
+A -> Http : 修改後重新送出
+Http -> Svc : submit → q.state=settled → nextOrderKey → 3（排在已判定名次之後）
+Svc -> BC : publish
+BC --> TC : teacher:state（第1組 新送出 #3）
+@enduml
