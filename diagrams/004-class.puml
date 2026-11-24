@@ -1,0 +1,212 @@
+@startuml 004-class
+scale max 4000 width
+title 004 結果與匯出 — 類別圖（依 TECH_SPEC v1.6）
+hide empty members
+skinparam nodesep 20
+skinparam ranksep 40
+
+package "列舉" {
+  enum Phase {
+    SETUP
+    READY
+    RUNNING
+    ENDED
+  }
+  enum SubmissionStatus {
+    active
+    withdrawn
+    rejected
+  }
+}
+
+package "實體" {
+  class Session {
+    +id: string
+    +roomCode: string
+    +phase: Phase
+    +spreadsheetId: string | null
+    +sheetTitle: string | null
+    +round: number
+  }
+  class Question {
+    +id: string
+    +number: number
+    +isGroup: boolean
+    +subCount: number
+  }
+  class AnswerSlot {
+    +id: string
+    +questionId: string
+    +subNo: number
+    +sheetTitle: string
+    +row: number
+    +col: number
+    +a1: string
+    +prefix: string
+    +originalValue: string
+  }
+  class Team {
+    +id: string
+    +index: number
+    +name: string
+  }
+  class Submission {
+    +id: string
+    +questionId: string
+    +teamId: string
+    +memberId: string
+    +answers: string[]
+    +serverTime: number
+    +seq: number
+    +status: SubmissionStatus
+    +orderKey: number | null
+  }
+}
+
+package "結果與匯出值物件" {
+  class Results {
+    +questions: ResultQuestion[]
+    +scores: TeamScore[]
+  }
+  class ResultQuestion {
+    +questionId: string
+    +number: number
+    +isGroup: boolean
+    +subLabels: string[]
+    +winner: ResultWinner | null
+    +ranking: ResultRankItem[]
+  }
+  class ResultWinner {
+    +teamId: string
+    +teamName: string
+    +answers: string[]
+    +submittedBy: string
+  }
+  class ResultRankItem {
+    +rank: number
+    +teamId: string
+    +teamName: string
+    +answers: string[]
+    +submittedBy: string
+    +serverTime: number
+    +status: 'active' | 'rejected'
+    +isWinner: boolean
+  }
+  class TeamScore {
+    +teamId: string
+    +teamName: string
+    +score: number
+  }
+  note bottom of TeamScore : 依 score 降冪、組序升冪
+  class CsvRow {
+    +questionNumber: number
+    +subNo: number
+    +teamName: string
+    +submittedBy: string
+    +answer: string
+    +serverTime: number
+    +rank: number | null
+    +status: SubmissionStatus
+    +isWinner: boolean
+  }
+  class CellWrite {
+    +sheetTitle: string
+    +a1: string
+    +value: string
+  }
+}
+
+package "domain／export" {
+  class ranking <<module>> {
+    +rankSubmissions(subs: Submission[]): RankedSubmission[]
+    +winnerOf(subs: Submission[]): Submission | null
+    +teamScores(teams: Team[], subsByQuestion: Map<string, Submission[]>): Map<string, number>
+  }
+  note right of ranking
+    rejected 保留名次但不能是得主；
+    withdrawn 不列入名次
+    → 判錯後自動遞補與重算分數
+  end note
+  class projections <<module>> {
+    +buildResults(agg: SessionAggregate): Results
+    +buildCsvRows(agg: SessionAggregate): CsvRow[]
+  }
+  class exporter <<module>> {
+    +buildExportWrites(slots: AnswerSlot[], questions: Question[], winners: Map<string, Submission>): CellWrite[]
+    +buildRestoreWrites(slots: AnswerSlot[]): CellWrite[]
+  }
+  note right of exporter
+    value = slot.prefix + winner.answers[subNo-1]
+    無得主不寫（照 TECH_SPEC §7.4）；
+    依 sheetTitle、row、col 排序
+  end note
+  class csv <<module>> {
+    +buildResultsCsv(rows: CsvRow[]): string
+  }
+  note right of csv
+    BOM、CRLF、固定表頭；
+    RFC 4180 跳脫；= + - @ 前加 '；
+    YYYY-MM-DDTHH:mm:ss.SSS+08:00
+  end note
+}
+
+package "ports" {
+  interface SheetsGateway {
+    +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
+    +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
+  }
+  class GoogleSheetsGateway {
+    +writeCells(spreadsheetId, writes): Promise<void>
+  }
+  class FakeSheetsGateway {
+    +writeCells(spreadsheetId, writes): Promise<void>
+    +getSnapshot(spreadsheetId: string): SheetSnapshot
+    +reset(spreadsheetId: string): void
+  }
+}
+
+package "services" {
+  class SessionService {
+    +rejectWinner(sessionId: string, questionId: string): TeacherView
+    +exportToSheet(sessionId: string): Promise<{updatedCells: number; writes: CellWrite[]}>
+    +restoreSheet(sessionId: string): Promise<{updatedCells: number}>
+    +exportCsv(sessionId: string): string
+  }
+  note right of SessionService
+    rejectWinner：RUNNING／ENDED；無得主 → NO_WINNER；
+    exportToSheet、exportCsv：ENDED；
+    exportToSheet 另對「無得主且有 rejected」題目
+    合併 buildRestoreWrites（plan D1）；
+    restoreSheet：READY／ENDED；
+    其餘 → INVALID_PHASE
+  end note
+}
+
+Session "1" *-- "many" Question
+Question "1" *-- "1..*" AnswerSlot
+Session "1" *-- "many" Team
+Question "1" o-- "many" Submission
+Team "1" o-- "many" Submission
+Submission --> SubmissionStatus
+Session --> Phase
+
+Results *-- ResultQuestion
+Results *-- TeamScore
+ResultQuestion *-- "0..1" ResultWinner
+ResultQuestion *-- "many" ResultRankItem
+
+SheetsGateway <|.. GoogleSheetsGateway
+SheetsGateway <|.. FakeSheetsGateway
+
+SessionService --> SheetsGateway : writeCells
+SessionService ..> ranking : winnerOf
+SessionService ..> exporter
+SessionService ..> projections : buildCsvRows
+SessionService ..> csv
+projections ..> ranking
+projections ..> Results : 產生
+projections ..> CsvRow : 產生
+exporter ..> AnswerSlot : 讀位置／前綴／原值
+exporter ..> CellWrite : 產生
+csv ..> CsvRow : 讀取
+@enduml

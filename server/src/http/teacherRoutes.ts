@@ -1,4 +1,4 @@
-// 老師 API（TECH_SPEC §8.1；001 範圍＋002 匯入）。只做 zod 驗證與轉換，業務規則在 SessionService。
+// 老師 API（TECH_SPEC §8.1；001 範圍＋002 匯入＋003 開始、結束、重新開始）。只做 zod 驗證與轉換，業務規則在 SessionService。
 import { AppError } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -64,6 +64,28 @@ export function teacherRoutes(auth: AuthService, service: SessionService): Route
     wrap(async (req, res) => {
       const { spreadsheet } = importBody.parse(req.body ?? {});
       res.status(200).json(await service.importSheet(String(req.params.id), spreadsheet));
+    }),
+  );
+
+  // 搶答控制（003）：按下即執行，沒有本文；回傳最新 TeacherView
+  r.post(
+    '/sessions/:id/start',
+    wrap((req, res) => {
+      res.status(200).json(service.start(String(req.params.id)));
+    }),
+  );
+
+  r.post(
+    '/sessions/:id/end',
+    wrap((req, res) => {
+      res.status(200).json(service.end(String(req.params.id)));
+    }),
+  );
+
+  r.post(
+    '/sessions/:id/reset',
+    wrap((req, res) => {
+      res.status(200).json(service.reset(String(req.params.id)));
     }),
   );
 

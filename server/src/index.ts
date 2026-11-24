@@ -1,6 +1,7 @@
-// 啟動入口：讀設定 → 開資料庫 → 依 SHEETS_MODE 組裝試算表閘道 → 監聽（recover 由 003 加入）
+// 啟動入口：讀設定 → 開資料庫 → 依 SHEETS_MODE 組裝試算表閘道 → listen 前以 boot/recover.ts 恢復搶答中的視窗 → 監聽
 import { google } from 'googleapis';
-import { createApp, type AppDeps } from './app.js';
+import { createApp, serviceOf, type AppDeps } from './app.js';
+import { recoverOnBoot } from './boot/recover.js';
 import { loadConfig } from './config.js';
 import { openDb } from './db/db.js';
 import { Repo } from './db/repo.js';
@@ -31,7 +32,7 @@ function buildSheets(): Pick<AppDeps, 'sheets' | 'fakeSheets'> {
 }
 
 const repo = new Repo(openDb(config.dbPath));
-const { httpServer } = createApp({
+const { app, httpServer } = createApp({
   repo,
   clock: systemClock,
   scheduler: timerScheduler(systemClock),
@@ -39,6 +40,9 @@ const { httpServer } = createApp({
   ...buildSheets(),
   auth: new AuthService(config.teacherPassword, cryptoIdGen),
 });
+
+// 重啟後：已過期的視窗立即結算、未到期的重新排程（TECH_SPEC §7.12）
+recoverOnBoot(serviceOf(app));
 
 httpServer.listen(config.port, () => {
   console.log(`伺服器已啟動：http://localhost:${config.port}`);

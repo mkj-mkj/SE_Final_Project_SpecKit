@@ -1,7 +1,9 @@
-// 型別化的資料存取（TECH_SPEC §5）。001：sessions、teams、members；002：questions、answer_slots、import_summary。
+// 型別化的資料存取（TECH_SPEC §5）。001：sessions、teams、members；002：questions、answer_slots、import_summary；
+// 003：drafts、submissions、seq、題目狀態、依階段查詢活動。全部使用參數化查詢（$name 具名參數）。
 import {
   AppError,
   type AnswerSlot,
+  type Draft,
   type FairnessMode,
   type ImportSummary,
   type Member,
@@ -9,6 +11,8 @@ import {
   type Question,
   type QuestionState,
   type Session,
+  type Submission,
+  type SubmissionStatus,
   type Team,
 } from '@quiz/shared';
 import type { Db } from './db.js';
@@ -78,12 +82,46 @@ function toSlot(r: Row): AnswerSlot {
   };
 }
 
+function toDraft(r: Row): Draft {
+  return {
+    teamId: r.team_id as string,
+    questionId: r.question_id as string,
+    answers: JSON.parse(r.answers as string) as string[],
+    updatedBy: r.updated_by as string,
+    updatedAt: Number(r.updated_at),
+  };
+}
+
+function toSubmission(r: Row): Submission {
+  return {
+    id: r.id as string,
+    sessionId: r.session_id as string,
+    questionId: r.question_id as string,
+    teamId: r.team_id as string,
+    memberId: r.member_id as string,
+    answers: JSON.parse(r.answers as string) as string[],
+    serverTime: Number(r.server_time),
+    seq: Number(r.seq),
+    status: r.status as SubmissionStatus,
+    orderKey: r.order_key === null ? null : Number(r.order_key),
+    withdrawnAt: r.withdrawn_at === null ? null : Number(r.withdrawn_at),
+  };
+}
+
+/** 唯一索引 uq_sub_team_q_live(team_id, question_id) 衝突：本組該題已有 active／rejected（research R-03） */
+function isLiveSubmissionConflict(e: unknown): boolean {
+  return e instanceof Error && /UNIQUE constraint failed: submissions\.team_id, submissions\.question_id/.test(e.message);
+}
+
 /** SQLite 的 UNIQUE(team_id, nickname_key) 衝突 */
 function isNicknameConflict(e: unknown): boolean {
   return e instanceof Error && /UNIQUE constraint failed: members\.team_id, members\.nickname_key/.test(e.message);
 }
 
 export class Repo {
+  /** 本實例上次發出的 seq（research R-02：與資料庫 MAX(seq) 取大者再 +1，確保嚴格遞增） */
+  private lastSeq = 0;
+
   constructor(readonly db: Db) {}
 
   // ---------- sessions ----------
@@ -285,5 +323,140 @@ export class Repo {
       )
       .all({ sessionId }) as Row[];
     return rows.map(toSlot);
+  }
+
+  /** 單一題目；不存在為 null */
+  getQuestion(id: string): Question | null {
+    const r = this.db.prepare('SELECT * FROM questions WHERE id = $id').get({ id }) as Row | undefined;
+    return r ? toQuestion(r) : null;
+  }
+
+  updateQuestionState(id: string, state: QuestionState, windowEndsAt: number | null): void {
+    this.db
+      .prepare('UPDATE questions SET state = $state, window_ends_at = $windowEndsAt WHERE id = $id')
+      .run({ id, state, windowEndsAt });
+  }
+
+  /** start、reset：該活動所有題目回到 open、清除視窗結束時間 */
+  resetQuestionStates(sessionId: string): void {
+    this.db
+      .prepare(`UPDATE questions SET state = 'open', window_ends_at = NULL WHERE session_id = $sessionId`)
+      .run({ sessionId });
+  }
+
+  /** 依階段列出活動（recover 用），依建立時間排序 */
+  listSessionsByPhase(phase: Phase): Session[] {
+    const rows = this.db
+      .prepare('SELECT * FROM sessions WHERE phase = $phase ORDER BY created_at, rowid')
+      .all({ phase }) as Row[];
+    return rows.map(toSession);
+  }
+
+  // ---------- drafts（answers 為 JSON；不 trim） ----------
+  /** 整題覆蓋（spec FR-016a：後到者整份取代） */
+  upsertDraft(d: Draft): void {
+    this.db
+      .prepare(
+        `INSERT INTO drafts (team_id, question_id, answers, updated_by, updated_at)
+         VALUES ($teamId, $questionId, $answers, $updatedBy, $updatedAt)
+         ON CONFLICT(team_id, question_id) DO UPDATE SET
+           answers = excluded.answers, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+      )
+      .run({ ...d, answers: JSON.stringify(d.answers) });
+  }
+
+  deleteDraft(teamId: string, questionId: string): void {
+    this.db
+      .prepare('DELETE FROM drafts WHERE team_id = $teamId AND question_id = $questionId')
+      .run({ teamId, questionId });
+  }
+
+  listDrafts(sessionId: string): Draft[] {
+    const rows = this.db
+      .prepare(
+        `SELECT d.* FROM drafts d JOIN teams t ON t.id = d.team_id
+         WHERE t.session_id = $sessionId ORDER BY t.idx, d.question_id`,
+      )
+      .all({ sessionId }) as Row[];
+    return rows.map(toDraft);
+  }
+
+  deleteDraftsBySession(sessionId: string): void {
+    this.db
+      .prepare('DELETE FROM drafts WHERE team_id IN (SELECT id FROM teams WHERE session_id = $sessionId)')
+      .run({ sessionId });
+  }
+
+  // ---------- submissions（answers 為 JSON） ----------
+  /** 下一個全域序號：max(本實例上次發出的值, 資料庫 MAX(seq)) + 1（重啟後也不會重複） */
+  nextSeq(): number {
+    const r = this.db.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM submissions').get() as Row;
+    this.lastSeq = Math.max(this.lastSeq, Number(r.m)) + 1;
+    return this.lastSeq;
+  }
+
+  /** 本組該題已有 active／rejected 時，唯一索引衝突轉成 ALREADY_SUBMITTED */
+  insertSubmission(s: Submission): void {
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO submissions (id, session_id, question_id, team_id, member_id, answers,
+             server_time, seq, status, order_key, withdrawn_at)
+           VALUES ($id, $sessionId, $questionId, $teamId, $memberId, $answers,
+             $serverTime, $seq, $status, $orderKey, $withdrawnAt)`,
+        )
+        .run({ ...s, answers: JSON.stringify(s.answers) });
+    } catch (e) {
+      if (isLiveSubmissionConflict(e)) throw new AppError('ALREADY_SUBMITTED');
+      throw e;
+    }
+  }
+
+  getSubmission(id: string): Submission | null {
+    const r = this.db.prepare('SELECT * FROM submissions WHERE id = $id').get({ id }) as Row | undefined;
+    return r ? toSubmission(r) : null;
+  }
+
+  /** 只更新有提供的欄位 */
+  updateSubmission(
+    id: string,
+    patch: { status?: SubmissionStatus; orderKey?: number | null; withdrawnAt?: number | null },
+  ): void {
+    const sets: string[] = [];
+    const params: Record<string, string | number | null> = { id };
+    if (patch.status !== undefined) {
+      sets.push('status = $status');
+      params.status = patch.status;
+    }
+    if (patch.orderKey !== undefined) {
+      sets.push('order_key = $orderKey');
+      params.orderKey = patch.orderKey;
+    }
+    if (patch.withdrawnAt !== undefined) {
+      sets.push('withdrawn_at = $withdrawnAt');
+      params.withdrawnAt = patch.withdrawnAt;
+    }
+    if (sets.length === 0) return;
+    this.db.prepare(`UPDATE submissions SET ${sets.join(', ')} WHERE id = $id`).run(params);
+  }
+
+  /** 依 seq 升冪 */
+  listSubmissions(sessionId: string): Submission[] {
+    const rows = this.db
+      .prepare('SELECT * FROM submissions WHERE session_id = $sessionId ORDER BY seq')
+      .all({ sessionId }) as Row[];
+    return rows.map(toSubmission);
+  }
+
+  /** 依 seq 升冪 */
+  listSubmissionsByQuestion(questionId: string): Submission[] {
+    const rows = this.db
+      .prepare('SELECT * FROM submissions WHERE question_id = $questionId ORDER BY seq')
+      .all({ questionId }) as Row[];
+    return rows.map(toSubmission);
+  }
+
+  deleteSubmissionsBySession(sessionId: string): void {
+    this.db.prepare('DELETE FROM submissions WHERE session_id = $sessionId').run({ sessionId });
   }
 }

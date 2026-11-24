@@ -1,0 +1,97 @@
+@startuml 004-sequence
+title 004 結果與匯出 — 時序圖（依 TECH_SPEC v1.6）
+actor 老師 as T
+participant "老師端\n(ResultsTable / ExportPanel\n/ useTeacher)" as TC
+participant "HTTP 路由" as Http
+participant "SessionService" as Svc
+participant "ranking／projections" as Dom
+participant "exporter／csv" as Exp
+database "資料庫" as DB
+participant "SheetsGateway" as G
+participant "Broadcaster" as BC
+participant "學生端\n(StudentResults / AnswerCard)" as SC
+
+== 一、結束後檢視結果 ==
+T -> TC : 按「結束搶答」（003）
+TC -> Http : POST /sessions/:id/end
+Http -> Svc : end(sessionId)
+Svc -> DB : 結算所有視窗 → phase=ENDED
+Svc -> BC : publish（全部）
+BC -> Dom : projectTeacherView（得主、順位、分數）
+BC --> TC : teacher:state
+TC -> T : 結果表：每題得主／答案／各組順位（含判錯、不含撤回）；\n無得主顯示「無」；分數降冪、同分組序升冪
+BC -> Dom : projectTeamView → phase=ENDED 才 buildResults
+BC --> SC : team:state（含 results）
+SC -> SC : 隱藏作答卡，顯示 StudentResults
+
+== 二、判錯與遞補（第 3 題：A 得主、B 第 2 名） ==
+T -> TC : 按第 3 題「判錯」
+TC -> Http : POST /sessions/:id/questions/:qid/reject-winner
+Http -> Svc : rejectWinner(sessionId, qid)
+group 單一同步交易
+  Svc -> Svc : assertPhase(phase,'rejectWinner')：RUNNING／ENDED\n否則 INVALID_PHASE
+  Svc -> DB : 題目屬於本活動？否則 QUESTION_NOT_FOUND
+  Svc -> DB : 讀取該題全部送出
+  Svc -> Dom : winnerOf(subs)
+  alt 有得主（A）
+    Svc -> DB : A.status = rejected（保留 orderKey／名次）
+  else 無得主
+    Svc --> Http : NO_WINNER
+    Http --> TC : 409「此題目前沒有得主」
+  end
+end
+Svc -> BC : publish（teacher＋全部組）
+BC -> Dom : winnerOf → B（下一個 active 且已結算）\nteamScores → A −1、B +1
+BC --> TC : teacher:state（B ★ 得主；A ✗ 判錯）
+alt ENDED
+  BC --> SC : team:state（results 更新，各組相同）
+else RUNNING
+  BC --> SC : 只給 A 組：mySubmissions 狀態 rejected\n→「老師判定此答案錯誤」、不可重送
+  BC --> SC : 其他組：不含判錯、得主、順位、分數（FR-10）
+end
+Svc --> Http : TeacherView
+Http --> TC : 200
+
+== 三、寫回 Google Sheets ==
+T -> TC : 按「寫回 Google Sheets」（busy：按鈕停用）
+TC -> Http : POST /sessions/:id/export
+Http -> Svc : exportToSheet(sessionId)
+Svc -> Svc : assertPhase(phase,'export')：ENDED，否則 INVALID_PHASE
+Svc -> DB : 載入 questions、answer_slots、submissions
+Svc -> Dom : 每題 winnerOf → winners
+Svc -> Exp : buildExportWrites(slots, questions, winners)
+Exp --> Svc : writes（例：G5「（1）CPU」、G6「（2）作業系統」、G11「0」；\n無得主題目不寫；位置只來自 AnswerSlot）
+Svc -> Exp : buildRestoreWrites(無得主且有 rejected 題目的 slots)\n（plan D1：判錯到無人遞補 → 原始值）
+Svc -> Svc : 合併兩份寫入，依 sheetTitle、row、col 排序；\n寫入為 0 筆時不呼叫閘道
+Svc -> G : writeCells(spreadsheetId, writes)（純文字值，只改作答格）
+alt 成功
+  G --> Svc : ok
+  Svc --> Http : { updatedCells: 3, writes }
+  Http --> TC : 200
+  TC -> T : 「已寫回 3 格」
+else 403
+  G --> Svc : SHEETS_PERMISSION_DENIED
+  Http --> TC : 403「沒有權限存取試算表，請將試算表共用給服務帳號」
+else 其他錯誤
+  G --> Svc : SHEETS_NOT_FOUND／SHEETS_ERROR
+  Http --> TC : 「找不到試算表」／「Google Sheets 發生錯誤，請稍後再試」（可重試）
+end
+note over Svc, BC : 寫回／還原／CSV 不改變活動狀態、不推播
+T -> TC : 按「還原原始內容」（READY／ENDED）
+TC -> Http : POST /sessions/:id/restore
+Http -> Svc : restoreSheet(sessionId)
+Svc -> Exp : buildRestoreWrites(slots)（value = originalValue）
+Svc -> G : writeCells(spreadsheetId, writes)
+Svc --> TC : { updatedCells }（「已還原 N 格」）
+
+== 四、下載 CSV ==
+T -> TC : 按「下載 CSV」
+TC -> Http : GET /sessions/:id/export.csv
+Http -> Svc : exportCsv(sessionId)
+Svc -> Svc : assertPhase(phase,'csv')：ENDED，否則 INVALID_PHASE
+Svc -> Dom : buildCsvRows(agg)\n每個送出 × 每個子題一列（含撤回、判錯）；\n題號 → 順位（null 最後）→ 子題
+Svc -> Exp : buildResultsCsv(rows)\nBOM、CRLF、表頭、跳脫、防公式、台北時間
+Exp --> Svc : csv 字串
+Http --> TC : 200 text/csv; charset=utf-8\nfilename="results-<roomCode>-r<round>.csv"
+TC -> T : 瀏覽器下載檔案
+@enduml

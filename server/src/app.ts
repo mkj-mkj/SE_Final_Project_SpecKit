@@ -45,6 +45,8 @@ export function createApp(deps: AppDeps): { app: Express; httpServer: HttpServer
   const service = new SessionService({ ...deps, broadcaster });
   target = createSocketBroadcaster(io, (sessionId) => service.loadAggregate(sessionId), deps.clock);
   attachSocket(io, { auth: deps.auth, service });
+  // 供 index.ts 啟動恢復與整合測試取得同一個 service（不改 createApp 的回傳型別，research D3）
+  app.locals.service = service;
 
   app.use(express.json());
   app.use('/api/teacher', teacherRoutes(deps.auth, service));
@@ -62,4 +64,11 @@ export function createApp(deps: AppDeps): { app: Express; httpServer: HttpServer
 
   app.use(errorHandler);
   return { app, httpServer, io };
+}
+
+/** 取出 createApp 組裝的 SessionService（TECH_SPEC §2：index.ts 以它在 listen 前執行 recover） */
+export function serviceOf(app: Express): SessionService {
+  const service: unknown = app.locals.service;
+  if (!(service instanceof SessionService)) throw new Error('serviceOf: app 不是由 createApp 建立');
+  return service;
 }

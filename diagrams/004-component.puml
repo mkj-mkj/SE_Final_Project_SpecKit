@@ -1,0 +1,74 @@
+@startuml 004-component
+scale max 4000 width
+title 004 結果與匯出 — 組件圖（依 TECH_SPEC v1.6）
+skinparam componentStyle uml2
+
+actor 老師 as T
+actor "學生（組員）" as S
+cloud "Google Sheets\n(原 Guided Notes)" as GS
+
+package "瀏覽器（老師端）" {
+  [管理頁\nTeacherDashboard\n(RUNNING／ENDED 顯示 ResultsTable（plan D2）；\nREADY／ENDED 顯示 ExportPanel)] as TDash
+  [結果表 ResultsTable\n(RUNNING 與 ENDED 的判錯入口；\nresults-table、result-winner-{q}、\nbtn-reject-{q}、score-{team}；\n無得主顯示「無」)] as RTable
+  [匯出面板 ExportPanel\n(btn-export-sheet、btn-restore-sheet、\nbtn-download-csv、export-result\n「已寫回 N 格」／「已還原 N 格」)] as ExpP
+  [useTeacher\n(rejectWinner、exportToSheet、\nrestoreSheet、downloadCsv)] as UT
+}
+
+package "瀏覽器（學生端）" {
+  [作答頁 Play\n(ENDED 畫面)] as Play
+  [學生結果 StudentResults\n(student-results、student-result-{q})] as SRes
+  [作答卡 AnswerCard\n(rejected：「老師判定此答案錯誤」，不可重送)] as Card
+}
+
+package "伺服器" {
+  [HTTP 路由 teacherRoutes\nPOST questions/:qid/reject-winner\nPOST export／POST restore\nGET export.csv] as Http
+  [搶答服務 SessionService\n(rejectWinner、exportToSheet、\nrestoreSheet、exportCsv)] as Svc
+  [階段規則 domain/phase\n(rejectWinner: RUNNING／ENDED；\nexport、csv: ENDED；restore: READY／ENDED)] as Phase
+  package "結果服務（domain）" {
+    [排名 ranking\n(rankSubmissions、winnerOf、teamScores；\n判錯保留名次但不能得主)] as Rank
+    [視圖投影 projections\n(buildResults、buildCsvRows；\nTeamView.results 只在 ENDED)] as Proj
+  }
+  package "匯出" {
+    [寫回 sheets/exporter\n(buildExportWrites：前綴＋答案、無得主不寫；\nbuildRestoreWrites：originalValue；\n因判錯而無得主的題目由 Svc 合併還原寫入（plan D1）)] as Exp
+    [CSV export/csv\n(buildResultsCsv：BOM、CRLF、\nRFC 4180 跳脫、防公式注入、台北時間)] as Csv
+  }
+  package "試算表閘道 SheetsGateway" {
+    [googleGateway.writeCells\n(values.batchUpdate、RAW；\n403→SHEETS_PERMISSION_DENIED、\n404→SHEETS_NOT_FOUND、其他→SHEETS_ERROR)] as GGw
+    [fakeGateway.writeCells\n(修改記憶體副本＋data/fake-sheets)] as FGw
+  }
+  [即時推播 Broadcaster\n(rejectWinner → teacher＋全部組)] as BC
+  [資料存取 Repo\n(submissions.status、answer_slots)] as Repo
+}
+
+database "資料庫\n(submissions / answer_slots / questions / teams / sessions)" as DB
+
+T --> RTable : 檢視結果、判錯（搶答中與結束後）
+T --> ExpP : 寫回／還原／下載 CSV
+TDash --> RTable
+TDash --> ExpP
+RTable --> UT
+ExpP --> UT
+UT --> Http : REST 指令
+
+S --> SRes : 檢視結果
+Play --> SRes
+Play --> Card
+
+Http --> Svc
+Svc --> Phase : assertPhase
+Svc --> Rank : winnerOf（判錯前後）
+Svc --> Proj : buildCsvRows
+Proj --> Rank
+Svc --> Exp : 寫回／還原寫入清單
+Exp ..> Repo : 位置只來自 AnswerSlot（禁止寫死）
+Svc --> Csv : buildResultsCsv
+Svc --> GGw : writeCells（SHEETS_MODE=google）
+Svc --> FGw : writeCells（SHEETS_MODE=fake）
+GGw --> GS : 只改作答格的值
+Svc --> Repo : 單一同步交易（判錯）
+Repo --> DB
+Svc --> BC : publish（只有判錯；寫回／還原／CSV 不推播）
+BC --> Proj
+BC ..> TDash : teacher:state
+BC ..> Play : team:state（ENDED 才含 results）
+@enduml
