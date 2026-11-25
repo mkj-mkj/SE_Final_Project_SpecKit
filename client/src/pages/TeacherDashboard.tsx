@@ -1,12 +1,16 @@
-// 老師管理頁（TECH_SPEC §10.1、§10.4）：無活動時只顯示建立按鈕；有活動顯示房間碼、匯入（SETUP／READY）、設定與組別
+// 老師管理頁（TECH_SPEC §10.1、§10.4）：無活動時只顯示建立按鈕；有活動顯示房間碼、匯入（SETUP／READY）、設定與組別；
+// 003：READY／RUNNING／ENDED 顯示控制列，RUNNING／ENDED 顯示即時狀態表（ResultsTable 屬 004）
 import { Navigate, useNavigate } from 'react-router-dom';
+import ControlBar from '../components/ControlBar';
 import ErrorBanner from '../components/ErrorBanner';
 import ImportForm from '../components/ImportForm';
 import ImportSummary from '../components/ImportSummary';
 import PhaseBadge from '../components/PhaseBadge';
 import RoomCode from '../components/RoomCode';
 import SettingsForm from '../components/SettingsForm';
+import StatusGrid from '../components/StatusGrid';
 import TeamList from '../components/TeamList';
+import { useServerClock } from '../hooks/useServerClock';
 import { useTeacher } from '../hooks/useTeacher';
 import { clearTeacher, loadTeacher } from '../storage';
 
@@ -17,8 +21,12 @@ export default function TeacherDashboard() {
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { view, error, busy, createSession, updateSettings, importSheet } = useTeacher();
-  const canImport = view !== null && (view.session.phase === 'SETUP' || view.session.phase === 'READY');
+  const { view, error, busy, createSession, updateSettings, importSheet, start, end, reset } = useTeacher();
+  const now = useServerClock(view?.serverNow);
+  const phase = view?.session.phase ?? null;
+  const canImport = phase === 'SETUP' || phase === 'READY';
+  const showControls = phase === 'READY' || phase === 'RUNNING' || phase === 'ENDED';
+  const showGrid = phase === 'RUNNING' || phase === 'ENDED';
 
   // 登出：清除身分並離開本頁（卸載時 useTeacher 會中斷 Socket）；不呼叫伺服器
   function logout() {
@@ -47,6 +55,21 @@ function Dashboard() {
       ) : (
         <>
           <RoomCode roomCode={view.session.roomCode} />
+          {showControls && (
+            <ControlBar
+              phase={view.session.phase}
+              busy={busy}
+              onStart={() => void start()}
+              onEnd={() => void end()}
+              onReset={() => void reset()}
+            />
+          )}
+          {showGrid && (
+            <section>
+              <h2>即時狀態</h2>
+              <StatusGrid view={view} now={now} />
+            </section>
+          )}
           {(canImport || view.importSummary) && (
             <section>
               <h2>匯入 Guided Notes</h2>

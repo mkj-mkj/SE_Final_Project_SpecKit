@@ -1,19 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { TeamView } from '@quiz/shared';
+import type { QuestionInfo, TeamView } from '@quiz/shared';
 import * as api from '../../src/api';
 import * as socket from '../../src/socket';
 import * as storage from '../../src/storage';
 import AnswerCard from '../../src/components/AnswerCard';
 import { usePlay } from '../../src/hooks/usePlay';
 import { useServerClock } from '../../src/hooks/useServerClock';
+import { formatClock } from '../../src/format';
 import { fakeConnection, makeTeamView } from '../helpers/fixtures';
 
 vi.mock('../../src/api');
 vi.mock('../../src/socket');
 
 const Q3 = 'q3';
+const GROUP: QuestionInfo = { id: 'q1', number: 1, isGroup: true, subCount: 2, subLabels: ['（1）', '（2）'] };
+const SINGLE: QuestionInfo = { id: Q3, number: 3, isGroup: false, subCount: 1, subLabels: [''] };
+type MySub = TeamView['mySubmissions'][string];
+
+/** 以 props 直接渲染 AnswerCard（UT-UI-CARD-01、02、04、05） */
+function renderCard(over: Partial<Parameters<typeof AnswerCard>[0]> = {}) {
+  const props: Parameters<typeof AnswerCard>[0] = {
+    question: SINGLE, phase: 'RUNNING', answers: [''], mySubmission: undefined,
+    now: () => Date.now(), onChange: vi.fn(), onSubmit: vi.fn(), onWithdraw: vi.fn(),
+    ...over,
+  };
+  const utils = render(<AnswerCard {...props} />);
+  return { ...utils, props };
+}
 
 /** RUNNING 的 TeamView：第 1 題題組、第 2、3 題單題 */
 function runningView(drafts: TeamView['drafts'] = {}): TeamView {
@@ -92,5 +107,74 @@ describe('AnswerCard', () => {
     act(() => { vi.advanceTimersByTime(1000); });
     act(() => { conn.emitState(runningView({ [Q3]: { answers: ['x'], updatedBy: 'm2', updatedAt: Date.now() } })); });
     expect(screen.getByTestId('answer-input-3-1')).toHaveValue('x');
+  });
+  it('UT-UI-CARD-01 phase READY 時所有輸入與送出 disabled，placeholder 為「等待老師開始」', () => {
+    renderCard({ question: GROUP, phase: 'READY', answers: ['', ''] });
+    for (const sub of [1, 2]) {
+      const input = screen.getByTestId(`answer-input-1-${sub}`);
+      expect(input).toBeDisabled();
+      expect(input).toHaveAttribute('placeholder', '等待老師開始');
+    }
+    expect(screen.getByTestId('btn-submit-1')).toBeDisabled();
+  });
+
+  it('UT-UI-CARD-02 RUNNING 題組只填一格時送出 disabled，填滿後可用；只填空白視為空', () => {
+    const { rerender, props } = renderCard({ question: GROUP, answers: ['CPU', ''] });
+    expect(screen.getByTestId('answer-card-1')).toHaveTextContent('（1）');
+    expect(screen.getByTestId('answer-card-1')).toHaveTextContent('（2）');
+    expect(screen.getByTestId('btn-submit-1')).toBeDisabled();
+    expect(screen.getByTestId('btn-submit-1')).toHaveTextContent('送出第 1 題');
+
+    rerender(<AnswerCard {...props} answers={['CPU', '   ']} />);
+    expect(screen.getByTestId('btn-submit-1')).toBeDisabled();
+
+    rerender(<AnswerCard {...props} answers={['CPU', '作業系統']} />);
+    expect(screen.getByTestId('btn-submit-1')).toBeEnabled();
+
+    // 輸入時以整份答案陣列回報
+    fireEvent.change(screen.getByTestId('answer-input-1-2'), { target: { value: 'OS' } });
+    expect(props.onChange).toHaveBeenCalledWith(['CPU', 'OS']);
+    fireEvent.click(screen.getByTestId('btn-submit-1'));
+    expect(props.onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('UT-UI-CARD-04 active 剩 7 秒顯示「撤回（7 秒）」並無條件進位；時間到 0 時按鈕消失', () => {
+    const serverTime = Date.now() - 3000;
+    const mine: MySub = {
+      id: 'sub-3', answers: ['0'], submittedBy: '小明', serverTime,
+      status: 'active', withdrawableUntil: Date.now() + 7000,
+    };
+    const { props } = renderCard({ answers: ['0'], mySubmission: mine });
+    expect(screen.getByTestId('answer-input-3-1')).toBeDisabled();
+    expect(screen.getByTestId('answer-input-3-1')).toHaveValue('0');
+    expect(screen.getByTestId('submitted-3')).toHaveTextContent(`已送出 ${formatClock(serverTime)}`);
+    expect(screen.getByTestId('withdraw-countdown-3')).toHaveTextContent('撤回（7 秒）');
+
+    act(() => { vi.advanceTimersByTime(700); });   // 剩 6300 ms
+    expect(screen.getByTestId('withdraw-countdown-3')).toHaveTextContent('撤回（7 秒）');
+
+    act(() => { vi.advanceTimersByTime(6100); });  // 剩 200 ms
+    expect(screen.getByTestId('withdraw-countdown-3')).toHaveTextContent('撤回（1 秒）');
+    fireEvent.click(screen.getByTestId('btn-withdraw-3'));
+    expect(props.onWithdraw).toHaveBeenCalledWith('sub-3');
+
+    act(() => { vi.advanceTimersByTime(250); });   // 已過期
+    expect(screen.queryByTestId('btn-withdraw-3')).toBeNull();
+    expect(screen.queryByTestId('withdraw-countdown-3')).toBeNull();
+    expect(screen.getByTestId('submitted-3')).toHaveTextContent(`已送出 ${formatClock(serverTime)}`);
+  });
+
+  it('UT-UI-CARD-05 withdrawn 時輸入可編輯且帶入原答案，送出按鈕出現', () => {
+    const mine: MySub = {
+      id: 'sub-1', answers: ['CPU', 'OS'], submittedBy: '小明', serverTime: Date.now() - 2000,
+      status: 'withdrawn', withdrawableUntil: null,
+    };
+    renderCard({ question: GROUP, answers: ['CPU', 'OS'], mySubmission: mine });
+    expect(screen.getByTestId('answer-input-1-1')).toBeEnabled();
+    expect(screen.getByTestId('answer-input-1-1')).toHaveValue('CPU');
+    expect(screen.getByTestId('answer-input-1-2')).toHaveValue('OS');
+    expect(screen.getByTestId('btn-submit-1')).toBeEnabled();
+    expect(screen.queryByTestId('submitted-1')).toBeNull();
+    expect(screen.queryByTestId('btn-withdraw-1')).toBeNull();
   });
 });
