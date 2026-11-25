@@ -26,8 +26,8 @@ package "伺服器" {
   [資料存取\nRepo\n(sessions、questions、answer_slots；\ndrafts 隨 questions 連帶刪除)] as Repo
 
   interface "SheetsGateway" as GW
-  [Google 試算表閘道\ngoogleGateway\n(SHEETS_MODE=google；writeCells 待 004)] as GG
-  [示範模式閘道\nfakeGateway\n(SHEETS_MODE=fake；writeCells 待 004)] as FG
+  [Google 試算表閘道\ngoogleGateway\n(SHEETS_MODE=google；writeCells 由 004 實作)] as GG
+  [示範模式閘道\nfakeGateway\n(SHEETS_MODE=fake；writeCells 由 004 實作)] as FG
 }
 
 cloud "Google Sheets" as GS

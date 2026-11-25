@@ -132,9 +132,9 @@ class GoogleSheetsGateway <<createGoogleGateway(client: sheets_v4.Sheets)>> {
 note bottom of GoogleSheetsGateway
   錯誤對照：403 → SHEETS_PERMISSION_DENIED
   404 → SHEETS_NOT_FOUND；其他 → SHEETS_ERROR
-  002：writeCells 丟出 SHEETS_ERROR（004 實作）
+  writeCells 由 004 實作
 end note
-class FakeSheetsGateway <<createFakeGateway(dir)>> {
+class FakeSheetsGateway <<createFakeGateway(dir, outDir?)>> {
   +fetchSnapshot(spreadsheetId: string): Promise<SheetSnapshot>
   +writeCells(spreadsheetId: string, writes: CellWrite[]): Promise<void>
   +getSnapshot(spreadsheetId: string): SheetSnapshot
@@ -143,7 +143,7 @@ class FakeSheetsGateway <<createFakeGateway(dir)>> {
 note bottom of FakeSheetsGateway
   id 必須為「fixture-{名稱}」，讀 {dir}/{名稱}.snapshot.json
   不符合或檔案不存在 → SHEETS_NOT_FOUND
-  002：writeCells 丟出 SHEETS_ERROR（004 實作）
+  writeCells 由 004 實作
 end note
 
 class devRoutes <<module>> {
