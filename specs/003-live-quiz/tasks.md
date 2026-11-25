@@ -189,7 +189,28 @@ description: "Task list for 003-live-quiz（依層次分 Phase：Setup → 後�
 
 - [X] T045 [FE] [US2] 在 `TeacherDashboard` 組裝：READY／RUNNING／ENDED 顯示 `ControlBar`（`onStart/onEnd/onReset` 接 `useTeacher` 的 start／end／reset，`busy` 接 `useTeacher.busy`）；RUNNING、ENDED 顯示 `StatusGrid`（`now` 用 `useServerClock(view.serverNow)`）；ResultsTable 屬 004 不加入。覆蓋測試：E2E-05、07、09、11（`client/src/pages/TeacherDashboard.tsx`）
 - [X] T046 [FE] [US1] [US4] [US6] [US7] 在 `Play` 組裝搶答畫面：保留 001 的 TeamHeader 與 PhaseBadge；依 `view.questions`（題號升冪）渲染 `AnswerCard`，`answers` 取 `view.drafts[qid]?.answers ?? Array(subCount).fill('')`（usePlay 已合併本地草稿與 withdrawn 初始值，不使用 TECH_SPEC 以外的欄位）、`mySubmission` 取 `view.mySubmissions[qid]`、`now` 用 `useServerClock(view.serverNow)`，`onChange` → `setDraft`、`onSubmit` → `submit(qid)`、`onWithdraw` → `withdraw(id)`；ENDED 時暫時沿用停用狀態的 AnswerCard（StudentResults 屬 004）。覆蓋測試：E2E-04、06、08、09、10（`client/src/pages/Play.tsx`）
-- [ ] T047 [FE] **Phase 3 驗收**：執行 `npm test` 與 `npm run lint` 全部通過（含 001、002 的測試）；依憲章原則 11 比對程式碼與 `diagrams/003-component.puml` 的瀏覽器端組件（TeacherDashboard、ControlBar、StatusGrid、useTeacher、format.ts、useServerClock、Play、AnswerCard、usePlay）及其依賴方向（Grid → format／clock、Card → usePlay／clock、hooks → HTTP），以及所有 `data-testid` 與 TECH_SPEC §10.4 逐字相同、沒有新增，不一致時修正（`client/src/`、`diagrams/003-*.puml`）
+- [X] T047 [FE] **Phase 3 驗收**：執行 `npm test` 與 `npm run lint` 全部通過（含 001、002 的測試）；依憲章原則 11 比對程式碼與 `diagrams/003-component.puml` 的瀏覽器端組件（TeacherDashboard、ControlBar、StatusGrid、useTeacher、format.ts、useServerClock、Play、AnswerCard、usePlay）及其依賴方向（Grid → format／clock、Card → usePlay／clock、hooks → HTTP），以及所有 `data-testid` 與 TECH_SPEC §10.4 逐字相同、沒有新增，不一致時修正（`client/src/`、`diagrams/003-*.puml`）
+  - **驗收紀錄（2026-11-25）**
+    - `npm test`：44 個測試檔、275 個測試全部通過（含 001、002 全部測試與 003 的 UT-UI-CARD、CTRL、GRID、FMT、CLOCK、DASH）。
+    - `npm run lint`：eslint 與 shared／server／client 三個 workspace 的 typecheck 皆無錯誤，未修改任何檔案。
+    - `client/` 匯入檢查：搜尋 `client/` 的 `.ts`／`.tsx`／`.json`，沒有任何 `server/` 或 `@quiz/server` 匯入；外部相依只有 `@quiz/shared`、react、react-dom、react-router-dom、socket.io-client 與測試工具。
+    - **`data-testid`（TECH_SPEC §10.4）— 一致**：`client/src` 的 testid 全部出現在 §10.4，沒有新增；003 的 `btn-start`、`btn-end`、`btn-reset`、`status-grid`、`status-cell-{qNumber}-{teamIndex}`、`question-state-{qNumber}`、`answer-card-{qNumber}`、`answer-input-{qNumber}-{subNo}`（subNo 從 1 開始）、`btn-submit-{qNumber}`、`submitted-{qNumber}`、`btn-withdraw-{qNumber}`、`withdraw-countdown-{qNumber}` 逐字相同。
+    - **003-component.puml（瀏覽器端）— 一致**
+      - TeacherDashboard：READY／RUNNING／ENDED 顯示 ControlBar，RUNNING／ENDED 顯示 StatusGrid（`client/src/pages/TeacherDashboard.tsx`）。
+      - ControlBar：三顆按鈕，依階段只有一顆可按，SETUP 或 `busy` 時全部停用（`client/src/components/ControlBar.tsx`）。
+      - StatusGrid：顯示 `—`、答案（以 `formatAnswers` 組成「（1）A／（2）B」）、送出者、`formatTime` 的 HH:mm:ss.SSS、`#順位`／`判定中`、`★ 得主`、`已撤回`、`✗ 判錯`；`state=window` 時欄標題顯示「判定中 x.x s」（`client/src/components/StatusGrid.tsx`）。依賴方向：Grid → format.ts、Grid → useServerClock 模組。
+      - useTeacher：`start`／`end`／`reset` → `api.start/end/reset` → `POST /api/teacher/sessions/:id/{start,end,reset}`（`client/src/hooks/useTeacher.ts`、`client/src/api.ts`）。
+      - AnswerCard：依 §10.4 狀態表實作 rejected 以外的列；RUNNING 中只顯示「已送出 HH:mm:ss」與「撤回（n 秒）」（秒數無條件進位，歸零後隱藏），不顯示得主、順位或分數（FR-10）（`client/src/components/AnswerCard.tsx`）。依賴方向：Card → useServerClock 模組。
+      - usePlay：`setDraft` 每題各自 300 ms debounce 後呼叫 `PUT /api/play/drafts/:qid`；`submit` 呼叫 `POST /api/play/submissions`；`withdraw` 呼叫 `POST /api/play/submissions/:id/withdraw`（`client/src/hooks/usePlay.ts`）。
+      - hooks → HTTP 只透過 REST；狀態只來自 `teacher:state`／`team:state` 快照。
+    - **003-component.puml — 圖表漏畫或有誤，經使用者決定改圖（已修改並重新產生 PNG）**
+      - 原圖畫的是 ControlBar → useTeacher、AnswerCard → usePlay；實際上呼叫 hook 的是 TeacherDashboard／Play，以 props callback 傳給子元件（T040、T044～T046 的規定）。已改為 TDash → UT、Play → UP，並在 Ctrl／Card 標註 props。
+      - 原圖漏畫：TeacherDashboard／Play 呼叫 `useServerClock(serverNow)`，把 `now` 傳給 Grid／Card，Grid／Card 只使用 `useTick`；AnswerCard → format.ts（`formatClock`「已送出 HH:mm:ss」）；AnswerCard 的 `answer-card-{q}`。已全部補上。
+      - 只記錄、不改圖（使用者決定維持抽象）：圖上畫 RoomT ..> TDash、RoomG ..> Play、hooks → HTTP；實際上 useTeacher／usePlay 透過 `socket.ts` 訂閱，REST 經過 `api.ts`。這只是抽象層級不同，依賴方向沒錯。
+    - **003-sequence.puml（學生端／老師端）— 一致**：送出 → 201 後顯示「已送出 HH:mm:ss」與「撤回（10 秒）」倒數；撤回 → 204，收到 `status=withdrawn` 的快照後作答卡可以編輯，並以撤回的答案為初始值（usePlay 合併，research R-11）；老師端 StatusGrid 依 `teacher:state` 顯示得主、`#n`、「判定中」倒數與「已撤回」。
+    - **003-class.puml（視圖型別）— 一致**：client 使用的 `TeacherView`、`TeacherCell`、`TeamView`（`mySubmissions` 的 `withdrawableUntil`）、`QuestionInfo`（`subLabels`）都從 `@quiz/shared` 匯入，typecheck 通過；學生端不讀取 rank、isWinner、score、state、windowEndsAt。
+    - 屬於 004 的範圍（不算不一致）：AnswerCard 的 rejected 列與 ENDED 時改顯示 StudentResults；目前 ENDED 時沿用停用狀態的 AnswerCard。
+    - 程式碼不需要修正，`client/` 沒有任何修改。
 
 **Checkpoint**：前端完成，E2E 可開始
 
