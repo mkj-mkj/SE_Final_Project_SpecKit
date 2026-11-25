@@ -239,3 +239,10 @@ Task: "T028 UT-UI-IMPORT-02 in client/test/components/ImportSummary.test.tsx"
 - 業務邏輯禁止直接呼叫 `Date.now()`、`setTimeout`、`Math.random()` 或 googleapis SDK（SDK 只出現在 `googleGateway.ts` 與 `index.ts`）
 - 「覆蓋測試」標註的模組沒有 TEST_SPEC 專屬 ID，由所列測試驗證；不新增無 ID 的測試
 - 每完成一個邏輯群組就 commit
+
+---
+
+## Phase 5: Convergence
+
+- [ ] T042 [FE] 讓「題號重複」錯誤在管理頁顯示重複的題號（例：「題號重複：2」）per FR-015、US3/AC6 (partial)：伺服器已回 `{ code: 'DUPLICATE_QUESTION_NUMBER', message: '題號重複：2' }`，但 `ErrorBanner` 只以 `messageOf(code)` 顯示固定文字「題號重複」。**先決條件（憲章 II）**：TECH_SPEC §10.6 規定前端只依 `error.code` 顯示 §11 訊息，與 spec FR-015 衝突；實作前先向使用者列出差異（出處、段落、衝突內容），取得同意並修改 TECH_SPEC §10.6（例如：`DUPLICATE_QUESTION_NUMBER` 改顯示伺服器回傳的 `error.message`）後才動程式；本子功能沒有對應的 TEST_SPEC 案例 ID，需要測試時依原則 II 提案新增 ID，不得新增無 ID 的測試（`client/src/components/ErrorBanner.tsx` 或 `client/src/messages.ts`）
+- [ ] T043 [QA] 更新 002 圖表，讓它和目前的程式碼一致 per Constitution XI (contradicts)：`002-class.puml` 的 GoogleSheetsGateway、FakeSheetsGateway 註記「002：writeCells 丟出 SHEETS_ERROR（004 實作）」改為「writeCells 由 004 實作」；`FakeSheetsGateway` 的簽名改為 `createFakeGateway(dir, outDir?)`；`002-component.puml` 的 googleGateway、fakeGateway「writeCells 待 004」同步修正；改完執行 `java -jar plantuml.jar "./diagrams/*.puml"` 重新產生 PNG 並確認無錯誤（`diagrams/002-class.puml`、`diagrams/002-component.puml`、對應 PNG）
