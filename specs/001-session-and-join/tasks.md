@@ -325,3 +325,13 @@ Task: "T071 UT-UI-JOIN-01～04 in client/test/components/JoinForm.test.tsx"
 - 業務邏輯禁止直接呼叫 `Date.now()`、`setTimeout`、`Math.random()`（只有 `ports/` 的正式實作可以）
 - 「覆蓋測試」標註的模組沒有 TEST_SPEC 專屬 ID，由所列測試驗證；不新增無 ID 的測試；實作後才執行的覆蓋屬 plan.md Complexity Tracking 記錄的例外
 - 每完成一個邏輯群組就 commit；Phase 1 單獨成一個 PR
+
+---
+
+## Phase 5: Convergence
+
+**Purpose**：`/speckit-converge`（2026-11-25）比對 spec.md、plan.md、tasks.md、`diagrams/001-*.puml` 與目前程式碼後找出的剩餘缺漏。Phase 4（T082–T090）尚未執行的部分仍以原任務為準，此處不重複列出。
+
+- [ ] T091 [FE] 修正 `Join` 頁的身分檢查：已保存學生身分但 `getPlayState` 回傳 UNAUTHORIZED 以外的錯誤（網路中斷、500 等）時，**保留**保存的身分、以 `ErrorBanner` 顯示錯誤（INTERNAL →「發生未預期錯誤，請重新整理」），且**不渲染** `JoinForm`，避免已加入的學生在伺服器暫時無法連線時重複加入並覆蓋原身分；UNAUTHORIZED 與無身分的行為維持不變。覆蓋測試：UT-UI-JOIN-05～06 須仍通過；新增情境沒有 TEST_SPEC 案例 ID，依 plan.md Complexity Tracking 不新增無 ID 的測試，改由 T093 手動驗證 per FR-027a、FR-039 (partial)（`client/src/pages/Join.tsx`）
+- [ ] T092 [FE] `SettingsForm` 的組數／視窗秒數超出範圍提示改用 TECH_SPEC §11 訊息：以 `messageOf('INVALID_INPUT')` 顯示「輸入格式不正確」，取代目前自訂的「組數須為 2–20」「視窗秒數須為 1–10」；`settings-save` 仍維持 disabled。覆蓋測試：UT-UI-SET-01～02 須仍通過 per SC-003、Edge Cases「組數或視窗秒數超出範圍」 (partial)（`client/src/components/SettingsForm.tsx`）
+- [ ] T093 [QA] 在 `docs/manual-test.md` 的 001 段落新增並執行兩項手動驗收，記錄結果：(a) 學生加入後停止伺服器，於同一瀏覽器開啟 `/join` → 顯示「發生未預期錯誤，請重新整理」、不出現加入表單、`localStorage` 的 `quiz.member` 仍存在；重新啟動伺服器後再開 `/join` → 導向 `/play` 回到原組別與暱稱（驗證 T091）；(b) 管理頁把組數改為 21、視窗秒數改為 0 → 顯示「輸入格式不正確」且無法儲存（驗證 T092）per FR-027a、SC-003 (partial)（`docs/manual-test.md`）
