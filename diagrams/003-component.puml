@@ -7,19 +7,20 @@ actor 老師 as T
 actor "學生（組員）" as S
 
 package "瀏覽器（老師端）" {
-  [管理頁\nTeacherDashboard\n(RUNNING 時顯示 StatusGrid)] as TDash
-  [控制列 ControlBar\n(btn-start／btn-end／btn-reset；\n依階段只有一個可按)] as Ctrl
+  [管理頁\nTeacherDashboard\n(RUNNING 時顯示 StatusGrid；\n呼叫 useTeacher、useServerClock，以 props 傳給子元件)] as TDash
+  [控制列 ControlBar\n(btn-start／btn-end／btn-reset；\n依階段只有一個可按；props：onStart／onEnd／onReset)] as Ctrl
   [即時狀態表 StatusGrid\n(status-grid、status-cell-{q}-{team}、question-state-{q}；\n— ／答案·送出者·HH:mm:ss.SSS·#順位或「判定中」／★ 得主／已撤回／✗ 判錯)] as Grid
   [useTeacher\n(start、end、reset)] as UT
-  [format.ts\n(formatTime、formatAnswers「（1）A／（2）B」)] as FmtT
-  [useServerClock\n(以 serverNow 校正倒數)] as ClockT
+  [format.ts\n(formatTime HH:mm:ss.SSS、formatAnswers「（1）A／（2）B」)] as FmtT
+  [useServerClock\n(useServerClock：以 serverNow 校正 now()；\nuseTick：定時重繪倒數)] as ClockT
 }
 
 package "瀏覽器（學生端）" {
-  [作答頁 Play\n(搶答畫面)] as Play
-  [作答卡 AnswerCard\n(answer-input-{q}-{sub}、btn-submit-{q}、\nsubmitted-{q}、btn-withdraw-{q}、withdraw-countdown-{q})] as Card
+  [作答頁 Play\n(搶答畫面；呼叫 usePlay、useServerClock，\n以 props 傳給 AnswerCard)] as Play
+  [作答卡 AnswerCard\n(answer-card-{q}、answer-input-{q}-{sub}、btn-submit-{q}、\nsubmitted-{q}、btn-withdraw-{q}、withdraw-countdown-{q}；\nprops：onChange／onSubmit／onWithdraw)] as Card
   [usePlay\n(setDraft 300 ms debounce、submit、withdraw)] as UP
-  [useServerClock\n(撤回倒數)] as ClockS
+  [useServerClock\n(useServerClock：校正 now()；useTick：撤回倒數重繪)] as ClockS
+  [format.ts\n(formatClock「已送出 HH:mm:ss」)] as FmtS
 }
 
 package "伺服器" {
@@ -47,17 +48,20 @@ database "資料庫\n(sessions / questions / drafts / submissions；\n唯一索�
 
 T --> Ctrl : 開始／結束／重新開始
 T --> Grid : 即時檢視
-TDash --> Ctrl
-TDash --> Grid
-Ctrl --> UT
+TDash --> Ctrl : props（start／end／reset、busy）
+TDash --> Grid : props（view、now）
+TDash --> UT
+TDash --> ClockT : useServerClock(serverNow)
 Grid --> FmtT
-Grid --> ClockT : 視窗倒數「判定中 x.x s」
+Grid --> ClockT : useTick；視窗倒數「判定中 x.x s」
 UT --> Http : REST 指令
 
 S --> Card : 輸入草稿、送出、撤回
-Play --> Card
-Card --> UP
-Card --> ClockS : 「撤回（n 秒）」
+Play --> Card : props（answers、mySubmission、now、\nsetDraft／submit／withdraw）
+Play --> UP
+Play --> ClockS : useServerClock(serverNow)
+Card --> ClockS : useTick；「撤回（n 秒）」
+Card --> FmtS
 UP --> Http : REST 指令
 
 Http --> Svc
