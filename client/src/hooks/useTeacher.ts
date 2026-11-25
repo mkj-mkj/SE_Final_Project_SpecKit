@@ -1,4 +1,4 @@
-// 老師端狀態（TECH_SPEC §10.3）：001 的 view、error、busy、createSession、updateSettings；002 的 importSheet
+// 老師端狀態（TECH_SPEC §10.3）：001 的 view、error、busy、createSession、updateSettings；002 的 importSheet；003 的 start、end、reset
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ImportSummary, TeacherView } from '@quiz/shared';
@@ -15,6 +15,9 @@ export interface UseTeacher {
   createSession(input: SettingsInput): Promise<void>;
   updateSettings(input: SettingsInput): Promise<void>;
   importSheet(spreadsheet: string): Promise<ImportSummary>;
+  start(): Promise<void>;
+  end(): Promise<void>;
+  reset(): Promise<void>;
 }
 
 export function useTeacher(): UseTeacher {
@@ -116,5 +119,20 @@ export function useTeacher(): UseTeacher {
     }
   }, [token, sessionId, onUnauthorized, fail]);
 
-  return { view, error, busy, createSession, updateSettings, importSheet };
+  /**
+   * 開始／結束／重新開始一輪（003）：按下即執行、沒有確認步驟（research D1）。
+   * 與 createSession 相同的 busy／error 處理；成功以回應的 view 更新，之後仍以 teacher:state 快照為準。
+   */
+  const phaseAction = useCallback(
+    (fn: (t: string, id: string) => Promise<TeacherView>) => {
+      if (!sessionId) return Promise.resolve();
+      return run((t) => fn(t, sessionId));
+    },
+    [run, sessionId],
+  );
+  const start = useCallback(() => phaseAction(api.start), [phaseAction]);
+  const end = useCallback(() => phaseAction(api.end), [phaseAction]);
+  const reset = useCallback(() => phaseAction(api.reset), [phaseAction]);
+
+  return { view, error, busy, createSession, updateSettings, importSheet, start, end, reset };
 }

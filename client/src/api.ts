@@ -79,6 +79,20 @@ export function importSheet(
   });
 }
 
+// ---------- 老師：搶答流程（003，contracts/rest-api.md） ----------
+function phaseAction(token: string, sessionId: string, action: 'start' | 'end' | 'reset'): Promise<TeacherView> {
+  return request(`/api/teacher/sessions/${encodeURIComponent(sessionId)}/${action}`, { method: 'POST', token });
+}
+export function start(token: string, sessionId: string): Promise<TeacherView> {
+  return phaseAction(token, sessionId, 'start');
+}
+export function end(token: string, sessionId: string): Promise<TeacherView> {
+  return phaseAction(token, sessionId, 'end');
+}
+export function reset(token: string, sessionId: string): Promise<TeacherView> {
+  return phaseAction(token, sessionId, 'reset');
+}
+
 // ---------- 公開 ----------
 export function getPublicInfo(roomCode: string): Promise<PublicSessionInfo> {
   return request(`/api/public/sessions/${encodeURIComponent(roomCode)}`);
@@ -90,4 +104,19 @@ export function join(roomCode: string, body: JoinBody): Promise<JoinResult> {
 // ---------- 學生 ----------
 export function getPlayState(token: string): Promise<PlayState> {
   return request('/api/play/state', { token });
+}
+
+// ---------- 學生：搶答（003，contracts/rest-api.md） ----------
+export interface SubmitResult { submissionId: string; serverTime: number; withdrawableUntil: number }
+
+/** 更新組內共編草稿（204） */
+export async function putDraft(token: string, questionId: string, answers: string[]): Promise<void> {
+  await request(`/api/play/drafts/${encodeURIComponent(questionId)}`, { method: 'PUT', token, body: { answers } });
+}
+export function submit(token: string, questionId: string, answers: string[]): Promise<SubmitResult> {
+  return request('/api/play/submissions', { method: 'POST', token, body: { questionId, answers } });
+}
+/** 撤回本組送出（204） */
+export async function withdraw(token: string, submissionId: string): Promise<void> {
+  await request(`/api/play/submissions/${encodeURIComponent(submissionId)}/withdraw`, { method: 'POST', token });
 }
