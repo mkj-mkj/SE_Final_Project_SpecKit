@@ -32,14 +32,16 @@ describe('ExportPanel', () => {
     expect(await screen.findByTestId('export-result')).toHaveTextContent('已寫回 3 格');
     expect(props.onExport).toHaveBeenCalledTimes(1);
 
-    // 延伸斷言（plan D3；TEST_SPEC 補登 UT-UI-EXP-02 前依 research D3 置於此）：還原成功 6 格 →「已還原 6 格」
-    fireEvent.click(buttons().restore);
-    expect(await screen.findByText('已還原 6 格')).toBeInTheDocument();
-    expect(screen.getByTestId('export-result')).toHaveTextContent('已還原 6 格');
-
     // 按下載 CSV → onDownload 被呼叫 1 次
     fireEvent.click(buttons().csv);
     expect(props.onDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('UT-UI-EXP-02 還原成功 6 格 → export-result 顯示「已還原 6 格」', async () => {
+    const { props } = renderPanel();
+    fireEvent.click(buttons().restore);
+    expect(await screen.findByTestId('export-result')).toHaveTextContent('已還原 6 格');
+    expect(props.onRestore).toHaveBeenCalledTimes(1);
   });
 
   it('UT-UI-EXP-01 onExport reject → export-result 不顯示成功文字', async () => {

@@ -188,3 +188,14 @@ T035/T036 results.it.test.ts   ∥   T037 results-visibility.it.test.ts
 | 跨 story | T001、T002、T019、T020、T033、T034、T039～T044 | E2E-17、MA-06～09、全部回歸 |
 
 **TECH_SPEC §14.1 004 列測試 ID 檢核**：UT-EXP（T003）、UT-CSV（T005、T007）、UT-GW-02（T009）、UT-GW-05（T011）、UT-PROJ-09（T007）、UT-SVC-REJ-01～07（T014）、UT-SVC-EXPORT-01～06（T016）、UT-UI-RES-01～02（T023）、UT-UI-EXP-01～02（T025）、UT-UI-CARD-06（T029）、UT-UI-PLAY-03（T027）、IT-FLOW-01（T035）、IT-CSV-01（T036）、IT-VIS-02（T037）、E2E-12～17（T038）、MA-03～08（T041）、全部測試回歸與 §2.3 覆蓋率門檻（T040）——全部涵蓋。
+
+---
+
+## Phase 6: Convergence
+
+**Purpose**：`/speckit-converge`（2026-11-27）比對 spec／plan／tasks、程式碼、`diagrams/004-*.puml` 與 `docs/`（PRD v1.3、TECH_SPEC v1.7、TEST_SPEC v1.4）後的剩餘工作。docs 已同步 D1～D3，T001 的 (a) 檢查現可通過。既有未完成任務（T001、T002、T014 的 UT-SVC-REJ-07、T017 的 D1 合併、T020、T034～T044）不在此重複。
+
+- [X] T045 [FE] [US3] **CRITICAL**：把 `ExportPanel.test.tsx` 中以 UT-UI-EXP-01 名義寫的「延伸斷言（plan D3）」拆成獨立的 `it('UT-UI-EXP-02 還原成功 6 格 → export-result 顯示「已還原 6 格」', …)`（TEST_SPEC v1.4 §5.8 已登錄此 ID），移除「TEST_SPEC 補登前」的暫時註解；UT-UI-EXP-01 只保留寫回相關斷言。不修改 `ExportPanel.tsx` per Constitution VII、TEST_SPEC v1.4 UT-UI-EXP-02 (partial)（`client/test/components/ExportPanel.test.tsx`）
+  - 📝 註記：EXP-01 保留 onDownload 斷言，因 TEST_SPEC 無 CSV 下載的 UI 測試 ID，避免失去覆蓋。
+- [ ] T046 [BE] [US3] （依賴 T017 的 D1 合併完成）更新 `README.md` 功能清單「寫回 Google Sheets」：刪除「此行為待 docs 同步後實作」的暫時說明，改為實際行為——因判錯而沒有得主的題目，寫回時該題作答格恢復為匯入時的原始值並計入「已寫回 N 格」；從未被判錯的無得主題目不寫 per FR-024、T019 (partial)（`README.md`）
+- [ ] T047 [BE] 把 `diagrams/004-component.puml`、`004-class.puml`、`004-sequence.puml` 標題的「依 TECH_SPEC v1.6」改為「依 TECH_SPEC v1.7」（圖表內容已含 D1～D3，不改其他內容），執行 `java -jar plantuml.jar "./diagrams/004-*.puml"` 重新產生 PNG 且無錯誤 per Constitution XI、TECH_SPEC v1.7 (partial)（`diagrams/004-*.puml`、`diagrams/004-*.png`）
