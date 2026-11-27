@@ -1,4 +1,5 @@
-// 老師端狀態（TECH_SPEC §10.3）：001 的 view、error、busy、createSession、updateSettings；002 的 importSheet；003 的 start、end、reset
+// 老師端狀態（TECH_SPEC §10.3）：001 的 view、error、busy、createSession、updateSettings；002 的 importSheet；003 的 start、end、reset；
+// 004 的 rejectWinner、exportToSheet、restoreSheet、downloadCsv
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ImportSummary, TeacherView } from '@quiz/shared';
@@ -18,6 +19,10 @@ export interface UseTeacher {
   start(): Promise<void>;
   end(): Promise<void>;
   reset(): Promise<void>;
+  rejectWinner(questionId: string): Promise<void>;
+  exportToSheet(): Promise<number>;
+  restoreSheet(): Promise<number>;
+  downloadCsv(): Promise<void>;
 }
 
 export function useTeacher(): UseTeacher {
@@ -134,5 +139,60 @@ export function useTeacher(): UseTeacher {
   const end = useCallback(() => phaseAction(api.end), [phaseAction]);
   const reset = useCallback(() => phaseAction(api.reset), [phaseAction]);
 
-  return { view, error, busy, createSession, updateSettings, importSheet, start, end, reset };
+  /**
+   * 004 的四個動作共用：busy／error 處理與 importSheet 相同，
+   * 失敗時設定 error（ErrorBanner 依 §11 顯示）並重新丟出，讓呼叫端（ExportPanel）不顯示成功訊息。
+   */
+  const act = useCallback(async <T>(fn: (t: string, id: string) => Promise<T>): Promise<T> => {
+    if (!token || !sessionId) {
+      if (!token) onUnauthorized();
+      throw toAppError({ code: token ? 'SESSION_NOT_FOUND' : 'UNAUTHORIZED', message: '尚無活動' });
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      return await fn(token, sessionId);
+    } catch (e) {
+      if (mounted.current) fail(e);
+      throw toAppError(e);
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }, [token, sessionId, onUnauthorized, fail]);
+
+  /** 判錯（E5）：成功以回傳的 TeacherView 更新；遞補與扣分由伺服器推導 */
+  const rejectWinner = useCallback((questionId: string) => act(async (t, id) => {
+    const v = await api.rejectWinner(t, id, questionId);
+    if (mounted.current) setView(v);
+  }), [act]);
+
+  const exportToSheet = useCallback(
+    () => act(async (t, id) => (await api.exportSheet(t, id)).updatedCells),
+    [act],
+  );
+  const restoreSheet = useCallback(
+    () => act(async (t, id) => (await api.restoreSheet(t, id)).updatedCells),
+    [act],
+  );
+
+  /** 下載 CSV：以暫時的 <a download> 觸發瀏覽器下載，完成後釋放 object URL */
+  const downloadCsv = useCallback(() => act(async (t, id) => {
+    const { blob, filename } = await api.downloadCsv(t, id);
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }), [act]);
+
+  return {
+    view, error, busy, createSession, updateSettings, importSheet, start, end, reset,
+    rejectWinner, exportToSheet, restoreSheet, downloadCsv,
+  };
 }

@@ -1,8 +1,9 @@
-// 學生作答頁：001 的組別資訊與階段；003 的搶答畫面（每題一張 AnswerCard）
-// ENDED 時暫時沿用停用狀態的 AnswerCard（StudentResults 屬 004）
+// 學生作答頁：001 的組別資訊與階段；003 的搶答畫面（每題一張 AnswerCard）；
+// 004：ENDED 且有 results 時不渲染 AnswerCard，改顯示 StudentResults（FR-09）
 import AnswerCard from '../components/AnswerCard';
 import ErrorBanner from '../components/ErrorBanner';
 import PhaseBadge from '../components/PhaseBadge';
+import StudentResults from '../components/StudentResults';
 import TeamHeader from '../components/TeamHeader';
 import { usePlay } from '../hooks/usePlay';
 import { useServerClock } from '../hooks/useServerClock';
@@ -20,7 +21,9 @@ export default function Play() {
             <TeamHeader team={view.team} me={me} />
             <PhaseBadge phase={view.session.phase} />
           </div>
-          {view.questions.length === 0 ? (
+          {view.session.phase === 'ENDED' && view.results ? (
+            <StudentResults results={view.results} />
+          ) : view.questions.length === 0 ? (
             <p className="play-waiting">等待老師開始</p>
           ) : (
             [...view.questions]
