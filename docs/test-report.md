@@ -1,10 +1,10 @@
-# 測試報告 2026-11-27 b38cde0（+ 002 Phase 4 QA：T035–T041，未提交）
+# 測試報告 2026-11-28 94a6061（+ 003 Phase 4 IT：T057–T062／T048–T053，未提交）
 
 ## 摘要
 
 | 層級 | 案例數 | 通過 | 失敗 | 略過 |
 |---|---|---|---|---|
-| UT + IT（`npm test`） | 288 | 288 | 0 | 0 |
+| UT + IT（`npm test`） | 298 | 298 | 0 | 0 |
 | E2E（`npm run test:e2e`，001＋002 範圍：E2E-03、18、01、02） | 4 | 4 | 0 | 0 |
 | MA（001 手動驗收 T089、T093） | 13 | 13 | 0 | 0 |
 | MA（002：MA-09 通過；MA-01、02 待 Kevin 執行） | 3 | 1 | 0 | 2（未執行） |
@@ -54,6 +54,23 @@ TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目
 - T040：機密與 `team:state` 資訊隔離檢查通過。
 - T041：`npm test`、`npm run lint`、`npm run test:e2e` 通過；002 圖表與程式碼一致。
 - 本次未發現產品缺陷。
+
+## 003 Phase 4 補充（T057–T062，涵蓋 T048–T053）
+
+- T057（T048）：`startApp(opts?)` 新增 `snapshots`（預設載入 fixture-template-a、b）、`realTime`（systemClock＋timerScheduler）、`dbPath`、`clock`，回傳值加 `clock`、`scheduler`（另加 `gateway`、`service`）；`close()` 會取消計時器並關閉 DB。新增 `flow.ts`（`login`、`createAndImport`、`joinMembers`、`joinMember`、`startQuiz`、`endQuiz`、`resetQuiz`、`submit`、`putDraft`、`getTeacherView`、`waitForEvent`）。001 的 IT 未修改且通過。
+- T058（T049）：`live.it.test.ts` IT-PHASE-01、IT-VAL-01、IT-VIS-01、IT-SYNC-01、IT-RT-01 通過。IT-VIS-01 以「B 自己存草稿並等到自己的 team:state」作為屏障，確保 end 前推給 B 的事件都已收到後才比對。
+- T059（T051）：`concurrency.it.test.ts` IT-CONC-01（realTime，20 組 × 50 輪）通過，約 4.2 秒。
+- T060（T050）：`recon.it.test.ts` IT-RECON-01（含「搶答中新成員加入」）、IT-RECON-02 通過。
+- T061（T052）：`restart.it.test.ts` IT-RESTART-01 通過；暫存 DB 建在 `os.tmpdir()`，測試結束刪除。另斷言 recover 前題目仍為 window，確認結算是由 `recoverOnBoot(serviceOf(app))` 完成。
+- T062（T053）：`perf.it.test.ts` IT-PERF-01（realTime，40 學生 socket＋老師，20 次送出）通過，p95 遠低於 500 ms（全部 20 次合計約 0.9 秒）。
+- IT 只連 127.0.0.1 的測試伺服器，不使用外部網路；除 IT-CONC-01、IT-PERF-01 外皆用 FakeClock＋ManualScheduler。
+- 本次未發現產品缺陷。
+
+### Q-002 UT-UI-PLAY-03 偶發失敗一次
+- 相關條文：TEST_SPEC §0.3（可重現）、§8.1-1
+- 觀察：加入 003 IT 後第一次執行 `npm test`，`client/test/pages/Play.test.tsx` UT-UI-PLAY-03 失敗一次（耗時 1057 ms，接近 `findBy*` 預設 1 秒等待），之後連續 3 次完整 `npm test` 皆 298/298 通過。與 Q-001 相同，推測為全套平行執行（IT-CONC-01、IT-PERF-01 使用真實時鐘、CPU 負載較高）時的等待逾時。
+- 採用的假設：不視為產品缺陷；`client/test/` 不在本次任務可修改範圍，未修改。
+- 影響的測試：UT-UI-PLAY-03
 
 ## 驗收結論：不通過（001、002 自動化範圍內全部通過）
 
