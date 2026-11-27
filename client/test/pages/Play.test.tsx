@@ -72,7 +72,7 @@ describe('Play', () => {
     vi.mocked(socket.connectMember).mockImplementation(() => conn);
 
     renderPlay();
-    expect(await screen.findByTestId('answer-card-1')).toBeInTheDocument();
+    expect(await screen.findByTestId('answer-card-1', undefined, { timeout: 3000 })).toBeInTheDocument();
 
     const rank = (teamId: string, teamName: string, answers: string[], r: number, isWinner: boolean,
       status: 'active' | 'rejected' = 'active') =>
@@ -101,7 +101,7 @@ describe('Play', () => {
     };
     act(() => conn.emitState(ended));
 
-    const results = await screen.findByTestId('student-results');
+    const results = await screen.findByTestId('student-results', undefined, { timeout: 3000 });
     expect(screen.getByTestId('student-result-1')).toHaveTextContent('第 2 組');
     expect(screen.getByTestId('student-result-1')).toHaveTextContent('（1）CPU（2）作業系統');
     expect(screen.getByTestId('student-result-3')).toHaveTextContent('第 1 組');

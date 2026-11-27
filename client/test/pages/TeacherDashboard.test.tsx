@@ -49,7 +49,7 @@ describe('TeacherDashboard', () => {
   it('UT-UI-DASH-02 GET /sessions/current 回 200 → 不存在 btn-create-session', async () => {
     vi.mocked(api.getCurrentSession).mockResolvedValue(makeTeacherView());
     renderDashboard();
-    expect(await screen.findByTestId('room-code')).toHaveTextContent('K7Q2MX');
+    expect(await screen.findByTestId('room-code', undefined, { timeout: 3000 })).toHaveTextContent('K7Q2MX');
     expect(screen.getByTestId('phase-badge')).toHaveTextContent('準備中');
     expect(screen.getByTestId('team-member-count-1')).toHaveTextContent('2');
     expect(screen.queryByTestId('btn-create-session')).not.toBeInTheDocument();

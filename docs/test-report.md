@@ -33,11 +33,13 @@ TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目
 
 ## 待釐清（Q-*）
 
-### Q-001 UT-UI-DASH-02 偶發失敗一次
+### Q-001 UT-UI-DASH-02 偶發失敗一次（已解決）
 - 相關條文：TEST_SPEC §0.3（可重現）、§8.1-1
 - 觀察：`npx vitest run --reporter=verbose` 全套連續 9 次中 1 次失敗（該次 stderr 未保存，無錯誤訊息），其餘 8 次及該檔單獨執行 3 次皆通過。測試以 `findByTestId('room-code')`（預設 1 秒等待）等待 mock 回應，推測為全套負載下的等待逾時，屬測試時序問題而非產品缺陷。
-- 採用的假設：不視為產品缺陷；`client/test/` 不在本次任務可修改範圍，未修改。
+- 採用的假設：不視為產品缺陷；發現時屬 QA 範圍不可修改；後續以 [FE] 身分於 fix/flaky-ui-tests 修正。
 - 影響的測試：UT-UI-DASH-02
+- 狀態：**已解決**（branch `fix/flaky-ui-tests`）
+- 處理方式：僅修改 `client/test/pages/TeacherDashboard.test.tsx`，將 UT-UI-DASH-02 的 `findByTestId('room-code')` 等待逾時由預設 1000 ms 放寬為 3000 ms（`{ timeout: 3000 }`）；斷言內容與 `client/src` 皆未修改。修改後連續執行 `npm test` 5 次，皆 53/53 檔、301/301 測試通過。
 
 ## 001 Phase 4 補充（T087–T090、T093）
 
@@ -78,11 +80,13 @@ TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目
 - 採用的假設：E2E-06 以第 2 組所有 `answer-input-*` 的值都不含「0」斷言；E2E-07 第 1 組送出前把第 3 題答案改為不會自然出現的字串 `G1ANS0`、暱稱使用 `Xena`／`Yuri`，再以第 2 組頁面全文不含這三個字串斷言（TEST_SPEC 未指定 E2E-07 的答案內容）。
 - 影響的測試：E2E-06、E2E-07
 
-### Q-002 UT-UI-PLAY-03 偶發失敗一次
+### Q-002 UT-UI-PLAY-03 偶發失敗一次（已解決）
 - 相關條文：TEST_SPEC §0.3（可重現）、§8.1-1
 - 觀察：加入 003 IT 後第一次執行 `npm test`，`client/test/pages/Play.test.tsx` UT-UI-PLAY-03 失敗一次（耗時 1057 ms，接近 `findBy*` 預設 1 秒等待），之後連續 3 次完整 `npm test` 皆 298/298 通過。與 Q-001 相同，推測為全套平行執行（IT-CONC-01、IT-PERF-01 使用真實時鐘、CPU 負載較高）時的等待逾時。
-- 採用的假設：不視為產品缺陷；`client/test/` 不在本次任務可修改範圍，未修改。
+- 採用的假設：不視為產品缺陷；發現時屬 QA 範圍不可修改；後續以 [FE] 身分於 fix/flaky-ui-tests 修正。
 - 影響的測試：UT-UI-PLAY-03
+- 狀態：**已解決**（branch `fix/flaky-ui-tests`）
+- 處理方式：僅修改 `client/test/pages/Play.test.tsx`，將 UT-UI-PLAY-03 中 `findByTestId('answer-card-1')` 與 `findByTestId('student-results')` 兩處等待逾時由預設 1000 ms 放寬為 3000 ms；斷言內容與 `client/src` 皆未修改。修改後連續執行 `npm test` 5 次，皆 53/53 檔、301/301 測試通過。
 
 ## 003 Convergence 驗收（T066，取代 T056）
 
