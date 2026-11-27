@@ -1,6 +1,6 @@
 @startuml 004-component
 scale max 4000 width
-title 004 結果與匯出 — 組件圖（依 TECH_SPEC v1.6）
+title 004 結果與匯出 — 組件圖（依 TECH_SPEC v1.7）
 skinparam componentStyle uml2
 
 actor 老師 as T

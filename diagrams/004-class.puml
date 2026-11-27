@@ -1,6 +1,6 @@
 @startuml 004-class
 scale max 4000 width
-title 004 結果與匯出 — 類別圖（依 TECH_SPEC v1.6）
+title 004 結果與匯出 — 類別圖（依 TECH_SPEC v1.7）
 hide empty members
 skinparam nodesep 20
 skinparam ranksep 40

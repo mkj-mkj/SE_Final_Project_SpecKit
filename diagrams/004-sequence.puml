@@ -1,5 +1,5 @@
 @startuml 004-sequence
-title 004 結果與匯出 — 時序圖（依 TECH_SPEC v1.6）
+title 004 結果與匯出 — 時序圖（依 TECH_SPEC v1.7）
 actor 老師 as T
 participant "老師端\n(ResultsTable / ExportPanel\n/ useTeacher)" as TC
 participant "HTTP 路由" as Http

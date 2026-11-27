@@ -1,6 +1,7 @@
 // 活動服務（TECH_SPEC §7.9）。001：createSession、getCurrentSession、getTeacherView、
 // updateSettings、getPublicInfo、join、resolveMember、getTeamView、setOnline；002：importSheet；
-// 003：start、end、reset、updateDraft、submit（純速度）；004：rejectWinner、exportToSheet、restoreSheet、exportCsv。
+// 003：start、end、reset、updateDraft、submit（純速度與公平模式）、withdraw、settleWindow（公平模式視窗結算）、
+// recover（重啟後補排程）、loadAggregate；004：rejectWinner、exportToSheet、restoreSheet、exportCsv。
 //
 // 寫入一律在單一同步交易（withTransaction）中完成；排程與推播等副作用只在 COMMIT 之後執行（research R-01）。
 // domain 與 service 不直接呼叫 Date.now()、setTimeout、Math.random()，一律用注入的 clock、scheduler、ids。
