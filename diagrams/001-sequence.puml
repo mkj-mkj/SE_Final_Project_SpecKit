@@ -48,6 +48,8 @@ opt 已保存學生身分（quiz.member）
     SC -> SC : 導向作答頁（不允許重複加入）
   else 身分失效（UNAUTHORIZED）
     SC -> SC : clearMember()；預填原房間碼
+  else 其他錯誤（網路中斷、500 等）
+    SC -> SC : 保留身分；ErrorBanner 顯示錯誤\n（不顯示加入表單，避免重複加入）
   end
 end
 S -> SC : 輸入房間碼（不分大小寫）
@@ -69,10 +71,10 @@ SC -> Svc : getTeamView(token)
 Svc --> SC : TeamView（組名、暱稱、組員、階段）
 SC -> BC : 即時連線 {member token}
 note right of BC : 先試 verifyTeacher(token)，\n不是老師身分再改用學生身分驗證
-BC -> Svc : resolveMember(token)；setOnline(memberId, true)
-BC --> SC : team:state
+BC -> Svc : resolveMember(token)；第一個連線時 setOnline(memberId, true)
 BC --> TC : teacher:state（成員上線）
 BC --> SC : team:state（推播給本組，組員看到上線）
+BC --> SC : team:state（目前完整狀態，給此連線）
 
 == 學生斷線後重連 ==
 SC -x BC : 斷線／重新整理
@@ -84,9 +86,9 @@ alt 網路短暫斷線（頁面未重新整理）
   BC -> Svc : resolveMember(token)
   alt 身分有效
     BC -> Svc : setOnline(memberId, true)
-    BC --> SC : team:state（目前完整狀態）
     BC --> TC : teacher:state（成員上線）
     BC --> SC : team:state（推播給本組）
+    BC --> SC : team:state（目前完整狀態）
   else 身分失效
     BC --> SC : connect_error UNAUTHORIZED
     SC -> SC : 清除身分；導向加入頁並帶入原房間碼
@@ -98,9 +100,9 @@ else 重新整理頁面
     Svc --> SC : TeamView（原組別與暱稱）
     SC -> BC : 即時連線 {member token}
     BC -> Svc : setOnline(memberId, true)
-    BC --> SC : team:state（目前完整狀態）
     BC --> TC : teacher:state（成員上線）
     BC --> SC : team:state（推播給本組）
+    BC --> SC : team:state（目前完整狀態）
   else 身分失效（UNAUTHORIZED）
     Svc --> SC : UNAUTHORIZED
     SC -> SC : 清除身分；導向加入頁並帶入原房間碼

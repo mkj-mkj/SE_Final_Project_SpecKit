@@ -2,6 +2,10 @@
 // TEST_SPEC §7：每位使用者獨立 browser.newContext()；只用 data-testid 選取；每個測試結束截圖到 e2e/artifacts/<ID>.png
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import config from '../playwright.config';
+
+// E2E 密碼只定義在 playwright.config.ts 的 webServer env（001 T087）
+const TEACHER_PASSWORD = (config.webServer as { env: Record<string, string> }).env.TEACHER_PASSWORD!;
 
 const artifact = (id: string) => fileURLToPath(new URL(`../artifacts/${id}.png`, import.meta.url));
 
@@ -35,7 +39,7 @@ test('E2E-03 4 個學生加入（第 1 組 2 人、第 2、3 組各 1 人），�
   teacherCtx = await browser.newContext();
   teacher = await teacherCtx.newPage();
   await teacher.goto('/teacher/login');
-  await teacher.getByTestId('teacher-password').fill('e2e-pass');
+  await teacher.getByTestId('teacher-password').fill(TEACHER_PASSWORD);
   await teacher.getByTestId('teacher-login-submit').click();
   await expect(teacher).toHaveURL(/\/teacher$/);
   await teacher.getByTestId('btn-create-session').click();
