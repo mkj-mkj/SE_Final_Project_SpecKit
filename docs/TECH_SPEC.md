@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.7（2026-11-27：同步 004 D1～D3——§7.9 exportToSheet 與 §12.6 合併 buildRestoreWrites（判錯到無得主的題目寫回原始值，D1）；§10.4 ResultsTable 在 RUNNING／ENDED 顯示、§10.5 搶答中可判錯（D2）；§10.4 ExportPanel `export-result` 文字「已寫回 {n} 格」／「已還原 {n} 格」（D3）；§14.1 004 列加 UT-SVC-REJ-07、UT-UI-EXP-02；同步 PRD v1.3）；前版 v1.6（2026-11-13：§7.8 SessionAggregate 新增 importSummary，供 projectTeacherView 輸出匯入摘要（specs/002 plan D9）；v1.5：fakeGateway 讀檔規則改為去掉 `fixture-` 前綴，對應 fixtures/sheets 實際檔名（specs/002 plan D1）；前版 v1.4：同步 PRD v1.2——匯入摘要文字固定格式、匯入進行中按鈕停用；v1.3：同步 PRD v1.1——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制） |
+| 版本 | v1.8（2026-11-27：002 T042——§10.6 加例外：`DUPLICATE_QUESTION_NUMBER` 顯示伺服器回傳的 `error.message`（含重複題號，例「題號重複：2」），對應 specs/002 FR-015）；前版 v1.7（2026-11-27：同步 004 D1～D3——§7.9 exportToSheet 與 §12.6 合併 buildRestoreWrites（判錯到無得主的題目寫回原始值，D1）；§10.4 ResultsTable 在 RUNNING／ENDED 顯示、§10.5 搶答中可判錯（D2）；§10.4 ExportPanel `export-result` 文字「已寫回 {n} 格」／「已還原 {n} 格」（D3）；§14.1 004 列加 UT-SVC-REJ-07、UT-UI-EXP-02；同步 PRD v1.3）；前版 v1.6（2026-11-13：§7.8 SessionAggregate 新增 importSummary，供 projectTeacherView 輸出匯入摘要（specs/002 plan D9）；v1.5：fakeGateway 讀檔規則改為去掉 `fixture-` 前綴，對應 fixtures/sheets 實際檔名（specs/002 plan D1）；前版 v1.4：同步 PRD v1.2——匯入摘要文字固定格式、匯入進行中按鈕停用；v1.3：同步 PRD v1.1——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制） |
 | 需求來源 | `docs/PRD.md`（FR-01～FR-12、E1～E5、E7） |
 | 測試規範 | `docs/TEST_SPEC.md` |
 | 讀者 | 實作 agent（主要）、測試 agent、組員 |
@@ -950,7 +950,7 @@ useServerClock(serverNow: number | undefined): () => number; // 回傳校正後�
 
 ### 10.6 錯誤訊息（`client/src/messages.ts`）
 
-前端依 `error.code` 顯示 §11 的中文訊息；未知代碼顯示「發生未預期錯誤，請重新整理」。
+前端依 `error.code` 顯示 §11 的中文訊息；未知代碼顯示「發生未預期錯誤，請重新整理」。例外：`DUPLICATE_QUESTION_NUMBER` 顯示伺服器回傳的 `error.message`（含重複題號，例「題號重複：2」）。
 
 ---
 
