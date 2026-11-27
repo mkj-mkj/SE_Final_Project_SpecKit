@@ -1,35 +1,70 @@
-# 測試報告 2026-11-28 ac95b20（+ 004 Phase 4 T034–T039，未提交）
+# 測試報告 2026-11-28 9f38bfe（最終驗收，004 Phase 5 T040–T044）
+
+執行環境：Windows 11、Node 22.13+、E2E 使用系統 Edge（`channel: 'msedge'`）。本報告的數值都在 commit `9f38bfe` 上執行（工作目錄乾淨，只有 `docs/` 的報告修改）。
 
 ## 摘要
 
-| 層級 | 案例數 | 通過 | 失敗 | 略過 |
-|---|---|---|---|---|
-| UT + IT（`npm test`） | 301 | 301 | 0 | 0 |
-| E2E（`npm run test:e2e`，E2E-01～18） | 18 | 18 | 0 | 0 |
-| MA（001 手動驗收 T089、T093） | 13 | 13 | 0 | 0 |
-| MA（002：MA-09 通過；MA-01、02 待 Kevin 執行） | 3 | 1 | 0 | 2（未執行） |
+| 層級 | 案例數（TEST_SPEC ID） | 測試數 | 通過 | 失敗 | 略過 |
+|---|---|---|---|---|---|
+| UT（§5） | 219 | 284 | 284 | 0 | 0 |
+| IT（§6） | 17 | 17 | 17 | 0 | 0 |
+| E2E（§7，E2E-01～18） | 18 | 18 | 18 | 0 | 0 |
+| MA（§8.2，MA-01～09） | 9 | — | 7 | 0 | 2（MA-06 未執行；MA-08 Demo 影片部分未確認） |
+| 子功能手動驗收（001 T089、T093；002 quickstart 2-4～2-7；003 quickstart §3 #3、#4、#7） | 13＋4＋3 | — | 20 | 0 | 0 |
+
+- 「測試數」為 vitest `it` 個數；一個 ID 可以對應多個 `it`（例如分成多個情境）。TEST_SPEC §5～§7 定義的 236 個 UT／IT ID 與 18 個 E2E ID，**每一個**都出現在通過的測試名稱中（以 vitest JSON 報告與 Playwright 輸出逐一比對，缺 0 個、多 0 個）。
+- `grep -rnE "it\.skip|test\.fixme|it\.only|test\.only|\.todo\(|describe\.(skip|only)" server/test client/test shared/test e2e/tests`：0 筆。
+- `npm run lint`（eslint ＋ shared／server／client／e2e 4 個 workspace typecheck）：無錯誤。
 
 ## 覆蓋率
 
-| 範圍 | Lines | Branches | 門檻 | 結果 |
+`npm run test:coverage`（結束碼 0；vitest `coverage.thresholds` 與 §2.3 相同，未調整門檻）：
+
+| 範圍 | Lines | Branches | 門檻（L / B） | 結果 |
 |---|---|---|---|---|
-| 全專案 | 86.84% | 89.12% | 80 / 75 | 通過 |
-| `server/src/domain/**` | 99.64% | 97.03% | 95 / 90 | 通過 |
-| `server/src/sheets/parser.ts` | 100% | 95.31% | 95 / 90 | 通過 |
-| `server/src/sheets/exporter.ts` | 100% | 92.85% | 95 / 90 | 通過 |
+| 全專案 | 87.68% | 89.36% | 80 / 75 | 通過 |
+| `server/src/domain/**` | 99.64% | 97.01% | 95 / 90 | 通過 |
+| `server/src/sheets/parser.ts` | 100% | 95.38% | 95 / 90 | 通過 |
+| `server/src/sheets/exporter.ts` | 100% | 93.33% | 95 / 90 | 通過 |
 | `server/src/export/**` | 100% | 100% | 95 / 90 | 通過 |
-| `server/src/services/**` | 98.99% | 93.59% | 90 / 85 | 通過 |
+| `server/src/services/**` | 99.00% | 93.72% | 90 / 85 | 通過 |
 | `shared/src/**` | 100% | 100% | 90 / 85 | 通過 |
 
-排除清單：`server/src/index.ts`。例外模組逐檔數值見 `docs/manual-test.md` 001 段落。
+**排除清單**（`vitest.config.ts`）：`server/src/index.ts`（建立 Google client、Express／Socket.IO 組裝、listen）與 `**/*.d.ts`。`googleGateway.ts` **未排除**（100% / 60.46%）：UT-GW-01～05 以 mock 的 `sheets_v4.Sheets` client 執行；真正連網只發生在 `index.ts` 建立 client 處（已排除）。004 相關其他模組：`export/csv.ts` 100% / 100%、`fakeGateway.ts` 100% / 91.3%、`http/teacherRoutes.ts` 96.07% / 86.66%、`client/src/components/ExportPanel.tsx` 100% / 100%。
 
 ## 追溯矩陣結果（§10 每列 通過/失敗）
 
-TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目全部通過。FR-01（匯入、辨識題號）、FR-02（只以題號表示）列：UT 與 E2E-01、02 通過，MA-02 待 Kevin 執行。003 列的 E2E-04～11 通過（`e2e/tests/live-quiz.spec.ts`）；E2E-12～17 屬 004，不在本次範圍。
+每列所列的 UT、IT、E2E ID 都已核對有對應測試並通過；MA 欄見 `docs/manual-test.md`。
+
+| 需求 | UT | IT | E2E／手動 | 結果 |
+|---|---|---|---|---|
+| FR-01 匯入、辨識題號 | 通過 | IT-FLOW-01 通過 | E2E-01、02 通過；MA-02、MA-09 通過 | **通過** |
+| FR-02 只以題號表示 | 通過 | IT-FLOW-01 通過 | E2E-01 通過 | **通過** |
+| FR-03 開始／結束 | 通過 | IT-SYNC-01 通過 | E2E-05、12、17 通過 | **通過** |
+| FR-04 老師即時狀態 | 通過 | IT-RT-01、IT-PERF-01 通過 | E2E-07 通過 | **通過** |
+| FR-05 老師看結果 | 通過 | IT-FLOW-01 通過 | E2E-12 通過 | **通過** |
+| FR-06 寫回原檔 | 通過（含 UT-UI-EXP-02） | IT-FLOW-01 通過 | E2E-14、15 通過；MA-03、MA-04 通過 | **通過** |
+| FR-07 開始後才能作答 | 通過 | IT-PHASE-01 通過 | E2E-04 通過 | **通過** |
+| FR-08 以組為單位 | 通過 | IT-CONC-01 通過 | E2E-06 通過 | **通過** |
+| FR-09 學生看結果 | 通過 | IT-VIS-02 通過 | E2E-12 通過 | **通過** |
+| FR-10 結束前看不到他組 | 通過 | IT-VIS-01 通過 | E2E-06、07 通過 | **通過** |
+| FR-11 最快者得分 | 通過 | IT-CONC-01 通過 | E2E-07 通過 | **通過** |
+| FR-12 階段同步 | 通過 | IT-SYNC-01、IT-RECON-02 通過 | E2E-05 通過 | **通過** |
+| E1 題組 | 通過 | IT-FLOW-01 通過 | E2E-08 通過 | **通過** |
+| E2 CSV | 通過 | IT-CSV-01 通過 | E2E-16 通過 | **通過** |
+| E3 公平機制 | 通過 | IT-RESTART-01 通過 | E2E-11 通過 | **通過** |
+| E4 撤回 | 通過 | IT-FLOW-01 通過 | E2E-09 通過 | **通過** |
+| E5 人工判錯 | 通過（含 UT-SVC-REJ-07） | IT-FLOW-01 通過 | E2E-13 通過 | **通過** |
+| E7 斷線重連 | 通過 | IT-RECON-01～02、IT-ONLINE-01、IT-RESTART-01 通過 | E2E-10、18 通過 | **通過** |
+| 身分（房間碼＋組別＋暱稱） | 通過 | IT-AUTH-01～03 通過 | E2E-03 通過 | **通過** |
+| 老師管理頁（登出、單一活動） | UT-UI-DASH-01～03 通過 | —（§10 未列） | —（§10 未列） | **通過（UT）**；IT／E2E 欄見 Q-008 |
+| 錯誤處理 | 通過 | IT-VAL-01 通過 | MA-05 通過 | **通過** |
+
+**TECH_SPEC §14.1 004 列核對（T044）**：UT-EXP-01～04、UT-CSV-01～07、UT-GW-02、UT-GW-05、UT-PROJ-09、UT-SVC-REJ-01～07、UT-SVC-EXPORT-01～06、UT-UI-RES-01～02、UT-UI-EXP-01～02、UT-UI-CARD-06、UT-UI-PLAY-03、IT-FLOW-01、IT-CSV-01、IT-VIS-02、E2E-12～17 皆有通過紀錄；MA-03、04、05、07 通過，MA-06 待 Demo 錄製時執行，MA-08 文件部分完成、Demo 影片待錄製後確認。
 
 ## 缺陷（DEF-*）
 
-無。
+無。001～004 最終驗收期間未發現產品缺陷，未修改 `client/src`、`server/src`、`shared/src`、README 與根目錄設定檔。
 
 ## 待釐清（Q-*）
 
@@ -141,6 +176,58 @@ TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目
 - 採用的假設：(1) E2E-15 先按一次 `btn-export-sheet` 並確認 G5 已寫入，再按還原斷言「已還原 6 格」與 fixture 相同；(2) E2E-16 以 `GET /api/teacher/sessions/current` 取得目前 `round`，斷言檔名為 `results-<roomCode>-r<round>.csv`（單獨執行本 spec 時即為 `r1`，已實際驗證）。
 - 影響的測試：E2E-15、E2E-16
 
-## 驗收結論：不通過（001～004 自動化範圍內全部通過）
+### Q-007 004 圖表與程式碼的 3 處標示差異（T044，已解決）
+- 相關條文：憲章原則 XI；`diagrams/004-class.puml`、`diagrams/004-sequence.puml`
+- 觀察：
+  1. `004-class.puml` 的 `ranking <<module>>` 只列 `rankSubmissions`、`winnerOf`、`teamScores`；程式另有公開函式 `orderSubmissions(subs): Submission[]`（`server/src/domain/ranking.ts:24`），003 的類別圖與組件圖已列出，004 的程式沒有直接呼叫它。
+  2. `004-sequence.puml` 第三段（寫回）與第四段（CSV）畫成先 `assertPhase` 再讀資料庫；`sessionService.ts` 的 `exportToSheet`、`exportCsv` 都是先 `loadAggregate` 再 `assertPhase`，回應結果相同。寫回時 `spreadsheetId` 為 null 會丟 `INVALID_PHASE`，這個分支圖上沒畫。
+  3. `004-sequence.puml` 的還原段沒畫 `assertPhase(phase,'restore')`（READY／ENDED，只寫在老師動作的標籤中）和「寫入 0 筆時不呼叫閘道」（`restoreSheet` 有此判斷）。
+- 採用的假設：三處都只是圖表標示不精確，對外行為（錯誤碼、寫入內容、HTTP 回應）與 TECH_SPEC 一致，**不是產品缺陷**。
+- 處理（組員 2026-11-28 決定）：
+  1. **不修改**。004 的圖只畫 004 用到的函式；`orderSubmissions` 屬 003，已在 `003-class.puml`、`003-component.puml` 中。
+  2. **已修改** `004-sequence.puml`：寫回段與 CSV 段改成先 `loadAggregate` 再 `assertPhase`；寫回段補上 `spreadsheetId` 為 null → `INVALID_PHASE`（409）的分支。
+  3. **已修改** `004-sequence.puml`：還原段補上 `assertPhase(phase,'restore')`（READY／ENDED，否則 INVALID_PHASE）、載入 answer_slots，以及「寫入為 0 筆時不呼叫閘道」；並依組員後續要求，比照寫回段補上 `spreadsheetId` 為 null → `INVALID_PHASE`（409）的分支（`restoreSheet` 在 `assertPhase` 之後檢查）。
+  - 執行 `java -jar plantuml.jar "./diagrams/004-*.puml"` 重新產生 3 張 PNG，無錯誤，並已目視確認 `004-sequence.png` 的內容。程式碼未修改。
+- 影響的測試：無
+- 狀態：**已解決**
 
-未滿足的 §8.1 條件：5（MA-01、MA-02 待 Kevin 以真實 Google 服務帳號執行；004 的 MA-03～08 待 T041）。§8.1 第 1、3 條的自動化部分（§5～§7 全部案例、E2E-12～17）已實作並通過；第 2 條覆蓋率與第 7 條乾淨 clone 待 004 Phase 5（T040、T043）重新確認。001、002 範圍內其餘自動化與手動驗收項目全部通過。
+### Q-008 §10「老師管理頁」列沒有 IT／E2E
+- 相關條文：TEST_SPEC §8.1 第 3 點（每列至少 1 個 UT 與 1 個 IT 或 E2E）、§10「老師管理頁（PRD §5.1 步驟 1–2：登出、單一活動）」列
+- 觀察：§10 這一列的 Integration 與 E2E／手動欄都是「—」，只列 UT-UI-DASH-01～03，字面上不符合 §8.1 第 3 點。不過 E2E-01（登入 → 建立活動）、E2E-03 與 E2E-04～17 都會操作管理頁（E2E 只在 `btn-create-session` 存在時才按，沒有斷言「已有活動時不顯示建立入口」）。「單一活動」與「登出」沒有 IT／E2E 斷言，由 UT-UI-DASH-01～03 與 001 T089 情境 1 的手動驗收涵蓋。
+- 採用的假設：該列是 TEST_SPEC 刻意設計為只有 UT（PRD 步驟 1–2 的 UI 行為），視為符合 §8.1 第 3 點；QA 不自行新增無 ID 的測試。若要嚴格符合，需由文件負責人在 TEST_SPEC 補登 E2E ID。
+- 影響的測試：UT-UI-DASH-01～03
+- 狀態：**已確認**（組員 2026-11-28 同意：TEST_SPEC 設計如此，視為符合 §8.1 第 3 點，不補 E2E）
+
+### plan D1～D3 的 docs 同步狀態（004）
+| 差異 | 內容 | docs 同步 | 對應測試 |
+|---|---|---|---|
+| D1 | 判錯到無人遞補的題目，寫回時恢復原始值 | 已同步：PRD v1.3 §8 第 9 點、TECH_SPEC v1.7 §7.9、§12.6、TEST_SPEC v1.4（UT-SVC-REJ-07） | UT-SVC-REJ-07、IT-FLOW-01 通過 |
+| D2 | 搶答中也可判錯（RUNNING 顯示 ResultsTable） | 已同步：TECH_SPEC v1.7 §10.4、§10.5（PRD 無需修改，見 PRD v1.3 修訂紀錄） | UT-UI-RES、IT-VIS-02、E2E-13 通過 |
+| D3 | 還原完成顯示「已還原 N 格」 | 已同步：TECH_SPEC v1.7 §10.4、TEST_SPEC v1.4（UT-UI-EXP-02） | UT-UI-EXP-02、E2E-15 通過 |
+
+目前 docs 版本：PRD v1.3、TECH_SPEC v1.8（v1.8 只改 002 的 §10.6，不影響 004）、TEST_SPEC v1.4。`diagrams/004-*.puml` 標題為「依 TECH_SPEC v1.7」（T047）。
+
+## 004 Phase 5 最終驗收（T040–T044）
+
+| 任務 | 結果 |
+|---|---|
+| T040 全部測試與覆蓋率 | 通過：`npm run lint` 無錯誤；`npm test` 53 檔、301/301；`npm run test:coverage` 結束碼 0，§2.3 每列門檻達成（見上方覆蓋率表）；`npm run test:e2e` 18/18（41.5 s）；skip／only／fixme／todo 0 筆；排除清單只有 `server/src/index.ts`、`**/*.d.ts` |
+| T041 手動驗收 MA-03～08 | MA-03、04、05 通過（2026-11-28／Kevin，截圖見 `docs/manual-test.md`）；MA-07 通過（Claude 執行 `git log --all -p` 搜尋）；**MA-06 待 Demo 錄製時執行**；**MA-08 文件部分完成、Demo 影片待錄製後確認** |
+| T043 README 與乾淨 clone | 通過：README 功能清單涵蓋 FR-01～12、E1～E5、E7（E1 題組、E2 CSV、E3 公平、E4 撤回、E5 判錯、E7 重連都有獨立條目）；「如何執行」含 `npm install`、`npm run dev`、範例 ID `fixture-template-a`／`fixture-template-b`、Google 模式設定與共用給服務帳號、`data/fake-sheets/<ID>.json`。從乾淨 clone（`git clone` 到暫存資料夾，commit `9f38bfe`，**未建立 `.env`**）依 README 執行 `npm install && npm test && npm run test:e2e` 一次成功：安裝 485 個套件、53 檔 301 測試通過、E2E 18/18 通過。未修改 README |
+| T044 最終一致性 | §14.1 004 列每個測試 ID 都有通過紀錄（見追溯矩陣段落）。`004-component.puml` 的組件、依賴、顯示條件（TeacherDashboard 的 `showGrid` 為 RUNNING／ENDED、`showExport` 為 READY／ENDED）、`data-testid`、閘道錯誤對應（403／404／其他）都和程式一致；`004-class.puml` 的實體、值物件、exporter／csv／projections／SessionService 簽名都和程式一致；`004-sequence.puml` 四段互動的主要順序也一致。3 處標示差異（Q-007）已依組員決定處理：第 1 點不修改（`orderSubmissions` 屬 003 的圖），第 2、3 點已修正 `004-sequence.puml`，並重新產生 `004-*.png`，無錯誤。**通過** |
+
+## 驗收結論：不通過（待 Demo 錄製後補記即可通過）
+
+逐條對照 §8.1：
+
+| # | 條件 | 結果 |
+|---|---|---|
+| 1 | §5、§6、§7 所有案例皆實作且通過，無 skip | **滿足**：UT 219 個 ID、IT 17 個、E2E 18 個全部通過；skip 0 |
+| 2 | 覆蓋率達 §2.3 門檻 | **滿足** |
+| 3 | §10 每列至少 1 UT＋1 IT／E2E 且全部通過 | **滿足**（「老師管理頁」列依 §10 原設計只有 UT，Q-008 已確認視為符合） |
+| 4 | 無未解決的 S1、S2 缺陷 | **滿足**：缺陷 0 筆 |
+| 5 | §8.2 手動驗收全部勾選並附截圖 | **未滿足**：MA-01～05、07、09 通過；**MA-06 待 Demo 錄製時執行並截圖；MA-08 待 Demo 影片錄製後確認** |
+| 6 | `npm run lint` 無錯誤 | **滿足** |
+| 7 | 乾淨 clone 依 README 一次成功 | **滿足** |
+
+唯一未滿足的條件是第 5 條，原因是 MA-06、MA-08 要在 Demo 錄製時才能執行，不是測試失敗或產品缺陷。Demo 錄製後，在 `docs/manual-test.md` 補記 MA-06 的結果與截圖、MA-08 的影片確認，即可改判為**通過**。Q-007（圖表）已解決，Q-008 已確認；目前沒有其他待決事項。

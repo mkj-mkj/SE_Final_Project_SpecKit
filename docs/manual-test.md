@@ -175,13 +175,13 @@
 
 ### T041 手動驗收（Google 模式）
 
-`SHEETS_MODE=google`，試算表為範例 A（`template-a.xlsx` 上傳為 Google Sheets）。MA-06～08 待組員執行。
+MA-03～05：`SHEETS_MODE=google`，試算表為範例 A（`template-a.xlsx` 上傳為 Google Sheets）。MA-07 已執行；MA-06 待 Demo 錄製時執行，MA-08 的 Demo 影片部分待錄製後確認。
 
 | ID | 項目 | 結果 | 日期／執行者 | 截圖 |
 | --- | --- | --- | --- | --- |
 | MA-03 | 真實寫回：前後截圖比對作答格為「前綴＋答案」，格式、合併與其他儲存格不變 | 通過：寫回後作答格依序為 G5「（1）A」、G6「（2）B」、G8「（1）123」、G9「（2）456」、G11「test123456」、G13「asdfgvb」——題組子題保留原前綴「（1）」「（2）」、單題只寫答案；題號、題目敘述、框線與題號欄的縱向合併與寫回前相同（依截圖比對） | 2026-11-28／Kevin | [ma-03-before.png](screenshots/ma-03-before.png)、[ma-03-after.png](screenshots/ma-03-after.png) |
 | MA-04 | 真實還原：還原後與匯入前一致 | 通過：按「還原原始內容」後管理頁顯示「已還原 6 格」；試算表 G5、G6、G8、G9 恢復為「（1）」「（2）」前綴、G11、G13 恢復為空白，與 ma-03-before 一致 | 2026-11-28／Kevin | [ma-04-restored.png](screenshots/ma-04-restored.png) |
 | MA-05 | 未共用給服務帳號的試算表 → 權限錯誤訊息 | 通過：顯示「沒有權限存取試算表，請將試算表共用給服務帳號」 | 2026-11-28／Kevin | [ma-05-denied.png](screenshots/ma-05-denied.png) |
-| MA-06 | 老師＋3 組（含 1 組 2 人）四分割完成一輪 | 待組員執行 | | |
-| MA-07 | `git log -p` 搜尋 `private_key`、`TEACHER_PASSWORD=` 實值 → 無結果 | 待組員執行 | | |
-| MA-08 | spec、`diagrams/*.puml`、README 功能清單、Demo 內容逐項一致 | 待組員執行 | | |
+| MA-06 | 老師＋3 組（含 1 組 2 人）四分割完成一輪 | 待 Demo 錄製時執行（組員回報將於錄製 Demo 時一併操作並截圖） | | （預定 `screenshots/ma-06-demo.png`） |
+| MA-07 | `git log -p` 搜尋 `private_key`、`TEACHER_PASSWORD=` 實值 → 無結果 | 通過：`git log --all -p`（67 個 commit）中 `private_key` 只出現在 `docs/TEST_SPEC.md`、`specs/*/tasks.md`、`docs/manual-test.md` 的檢查說明文字；`BEGIN PRIVATE KEY` 只出現在 002 T040 的說明文字（無金鑰內容）；`TEACHER_PASSWORD=` 的值只有 `.env.example` 的 `change-me` 與 E2E 專用 `e2e-pass`；`.env`、`secrets/`、`service-account*`、`credentials*` 從未被追蹤（`git log --all --name-only` 無結果），`.gitignore` 第 4～6 行涵蓋 `data/`、`secrets/`、`.env` | 2026-11-28／Claude（指令輸出未存檔） | — |
+| MA-08 | spec、`diagrams/*.puml`、README 功能清單、Demo 內容逐項一致 | 部分完成：spec ↔ README 功能清單 ↔ `diagrams/004-*.puml` 已逐項比對（Claude，2026-11-28），功能一致；圖表 3 處標示差異已處理（`docs/test-report.md` Q-007，已解決）。Demo 影片尚未錄製，**待錄製後確認** | 2026-11-28／Claude（文件部分） | — |

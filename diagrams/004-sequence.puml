@@ -56,8 +56,12 @@ Http --> TC : 200
 T -> TC : 按「寫回 Google Sheets」（busy：按鈕停用）
 TC -> Http : POST /sessions/:id/export
 Http -> Svc : exportToSheet(sessionId)
+Svc -> DB : loadAggregate：載入 session、questions、answer_slots、submissions
 Svc -> Svc : assertPhase(phase,'export')：ENDED，否則 INVALID_PHASE
-Svc -> DB : 載入 questions、answer_slots、submissions
+alt spreadsheetId 為 null（未匯入）
+  Svc --> Http : INVALID_PHASE
+  Http --> TC : 409
+end
 Svc -> Dom : 每題 winnerOf → winners
 Svc -> Exp : buildExportWrites(slots, questions, winners)
 Exp --> Svc : writes（例：G5「（1）CPU」、G6「（2）作業系統」、G11「0」；\n無得主題目不寫；位置只來自 AnswerSlot）
@@ -80,14 +84,21 @@ note over Svc, BC : 寫回／還原／CSV 不改變活動狀態、不推播
 T -> TC : 按「還原原始內容」（READY／ENDED）
 TC -> Http : POST /sessions/:id/restore
 Http -> Svc : restoreSheet(sessionId)
+Svc -> Svc : assertPhase(phase,'restore')：READY／ENDED，否則 INVALID_PHASE
+alt spreadsheetId 為 null（未匯入）
+  Svc --> Http : INVALID_PHASE
+  Http --> TC : 409
+end
+Svc -> DB : 載入 answer_slots
 Svc -> Exp : buildRestoreWrites(slots)（value = originalValue）
-Svc -> G : writeCells(spreadsheetId, writes)
+Svc -> G : writeCells(spreadsheetId, writes)（寫入為 0 筆時不呼叫閘道）
 Svc --> TC : { updatedCells }（「已還原 N 格」）
 
 == 四、下載 CSV ==
 T -> TC : 按「下載 CSV」
 TC -> Http : GET /sessions/:id/export.csv
 Http -> Svc : exportCsv(sessionId)
+Svc -> DB : loadAggregate
 Svc -> Svc : assertPhase(phase,'csv')：ENDED，否則 INVALID_PHASE
 Svc -> Dom : buildCsvRows(agg)\n每個送出 × 每個子題一列（含撤回、判錯）；\n題號 → 順位（null 最後）→ 子題
 Svc -> Exp : buildResultsCsv(rows)\nBOM、CRLF、表頭、跳脫、防公式、台北時間
