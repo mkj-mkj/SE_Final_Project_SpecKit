@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 版本 | v1.3（2026-11-13：同步 PRD v1.2／TECH_SPEC v1.4——匯入摘要文字、匯入進行中按鈕停用、題號 0 與前面補零、fake 模式匯入 < 2 秒、README 列出範例 ID；前版 v1.2：同步 PRD v1.1／TECH_SPEC v1.3——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制、組別人數不設上限） |
+| 版本 | v1.4（2026-11-27：同步 004 D1～D3——新增 UT-SVC-REJ-07（判錯到無人遞補 → 匯出寫回原始值，D1）、UT-UI-EXP-02（還原成功顯示「已還原 N 格」，D3），§10 追溯矩陣 E5、FR-06 列同步；同步 PRD v1.3／TECH_SPEC v1.7）；前版 v1.3（2026-11-13：同步 PRD v1.2／TECH_SPEC v1.4——匯入摘要文字、匯入進行中按鈕停用、題號 0 與前面補零、fake 模式匯入 < 2 秒、README 列出範例 ID；前版 v1.2：同步 PRD v1.1／TECH_SPEC v1.3——老師登出、系統只有一個活動、已加入學生開 /join 直接回 /play、暱稱字元限制、組別人數不設上限） |
 | 依據 | `docs/PRD.md`、`docs/TECH_SPEC.md`（介面契約） |
 | 讀者 | 測試 agent（主要）、實作 agent、助教 |
 
@@ -451,6 +451,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-SVC-REJ-04 | READY 中判錯 | INVALID_PHASE |
 | UT-SVC-REJ-05 | 被判錯的組再送該題 | ALREADY_SUBMITTED |
 | UT-SVC-REJ-06 | ENDED 中判錯後匯出 | 寫回的是遞補者答案 |
+| UT-SVC-REJ-07 | （v1.4 新增：specs/004 D1）範例 A，ENDED；第 3 題唯一送出被判錯（判錯到無人遞補）後匯出 | gateway 收到 G11 = 該格 originalValue；回傳 updatedCells 含該格 |
 
 **UT-SVC-EXPORT（FR-06／E2）**
 
@@ -509,6 +510,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | UT-UI-RES-01 | ResultsTable | 有得主與無得主的題目 | 正確顯示；無得主顯示「無」 |
 | UT-UI-RES-02 | ResultsTable | 按 `btn-reject-1` | 呼叫 rejectWinner(第 1 題 id) |
 | UT-UI-EXP-01 | ExportPanel | 匯出成功 3 格 | `export-result` 顯示「已寫回 3 格」 |
+| UT-UI-EXP-02 | ExportPanel | （v1.4 新增：specs/004 D3）還原成功 6 格 | `export-result` 顯示「已還原 6 格」 |
 | UT-UI-JOIN-01 | JoinForm | 輸入房間碼 → 下一步 | 呼叫 getPublicInfo；顯示各組與人數 |
 | UT-UI-JOIN-02 | JoinForm | 未選組或暱稱空白 | `join-submit` disabled |
 | UT-UI-JOIN-03 | JoinForm | api 回 NICKNAME_TAKEN | 顯示錯誤，不導頁 |
@@ -676,7 +678,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | FR-03 開始／結束 | UT-PHASE-01～03、UT-SVC-PHASE-01～05、UT-UI-CTRL-01 | IT-SYNC-01 | E2E-05、E2E-12、E2E-17 |
 | FR-04 老師即時狀態 | UT-PROJ-02、03、10、UT-UI-GRID-01～02、UT-BC-01 | IT-RT-01、IT-PERF-01 | E2E-07 |
 | FR-05 老師看結果 | UT-RANK-01～09、UT-PROJ-08、UT-UI-RES-01 | IT-FLOW-01 | E2E-12 |
-| FR-06 寫回原檔 | UT-EXP-01～04、UT-GW-01～05、UT-SVC-EXPORT-01～03、06、UT-UI-EXP-01 | IT-FLOW-01 | E2E-14、E2E-15、MA-03、MA-04 |
+| FR-06 寫回原檔 | UT-EXP-01～04、UT-GW-01～05、UT-SVC-EXPORT-01～03、06、UT-UI-EXP-01、UT-UI-EXP-02 | IT-FLOW-01 | E2E-14、E2E-15、MA-03、MA-04 |
 | FR-07 開始後才能作答 | UT-PHASE-01、UT-SVC-SUB-01、UT-SVC-DRAFT-02、UT-UI-CARD-01 | IT-PHASE-01 | E2E-04 |
 | FR-08 以組為單位 | UT-SVC-SUB-04、UT-SVC-DRAFT-01～06、UT-REPO-03～04 | IT-CONC-01 | E2E-06 |
 | FR-09 學生看結果 | UT-PROJ-06、UT-UI-PLAY-03 | IT-VIS-02 | E2E-12 |
@@ -687,7 +689,7 @@ export function seedRunning(t: ReturnType<typeof makeTestService>, opts?: {
 | E2 CSV | UT-CSV-01～07、UT-PROJ-09、UT-SVC-EXPORT-04～05 | IT-CSV-01 | E2E-16 |
 | E3 公平機制 | UT-SETTLE-01～06、UT-SVC-FAIR-01～10、UT-SVC-PHASE-03、UT-UI-SET-01 | IT-RESTART-01 | E2E-11 |
 | E4 撤回 | UT-SVC-WD-01～06、UT-PROJ-07、UT-RANK-04、UT-UI-CARD-04～05 | IT-FLOW-01 | E2E-09 |
-| E5 人工判錯 | UT-SVC-REJ-01～06、UT-RANK-05、09、UT-UI-RES-02、UT-UI-CARD-06 | IT-FLOW-01 | E2E-13 |
+| E5 人工判錯 | UT-SVC-REJ-01～06、UT-SVC-REJ-07、UT-RANK-05、09、UT-UI-RES-02、UT-UI-CARD-06 | IT-FLOW-01 | E2E-13 |
 | E7 斷線重連 | UT-SVC-JOIN-08、UT-SVC-RECOVER-01～03、UT-UI-STORE-01～03、UT-UI-PLAY-01～02、UT-UI-JOIN-05～06 | IT-RECON-01～02、IT-ONLINE-01、IT-RESTART-01 | E2E-10、E2E-18 |
 | 身分（房間碼＋組別＋暱稱） | UT-VAL-01～06、12～13、UT-SVC-JOIN-01～07、09～10、UT-AUTH-01～04、UT-UI-JOIN-01～04 | IT-AUTH-01～03 | E2E-03 |
 | 老師管理頁（PRD §5.1 步驟 1–2：登出、單一活動） | UT-UI-DASH-01～03 | — | — |
