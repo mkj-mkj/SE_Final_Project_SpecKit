@@ -8,14 +8,14 @@ actor "學生（組員）" as S
 cloud "Google Sheets\n(原 Guided Notes)" as GS
 
 package "瀏覽器（老師端）" {
-  [管理頁\nTeacherDashboard\n(RUNNING／ENDED 顯示 ResultsTable（plan D2）；\nREADY／ENDED 顯示 ExportPanel)] as TDash
+  [管理頁\nTeacherDashboard\n(RUNNING／ENDED 顯示 ResultsTable（plan D2）；\nREADY／ENDED 顯示 ExportPanel；\n呼叫 useTeacher，以 props 傳給子元件)] as TDash
   [結果表 ResultsTable\n(RUNNING 與 ENDED 的判錯入口；\nresults-table、result-winner-{q}、\nbtn-reject-{q}、score-{team}；\n無得主顯示「無」)] as RTable
   [匯出面板 ExportPanel\n(btn-export-sheet、btn-restore-sheet、\nbtn-download-csv、export-result\n「已寫回 N 格」／「已還原 N 格」)] as ExpP
   [useTeacher\n(rejectWinner、exportToSheet、\nrestoreSheet、downloadCsv)] as UT
 }
 
 package "瀏覽器（學生端）" {
-  [作答頁 Play\n(ENDED 畫面)] as Play
+  [作答頁 Play\n(ENDED 且有 results 時不渲染 AnswerCard，\n改顯示 StudentResults)] as Play
   [學生結果 StudentResults\n(student-results、student-result-{q})] as SRes
   [作答卡 AnswerCard\n(rejected：「老師判定此答案錯誤」，不可重送)] as Card
 }
@@ -44,15 +44,14 @@ database "資料庫\n(submissions / answer_slots / questions / teams / sessions)
 
 T --> RTable : 檢視結果、判錯（搶答中與結束後）
 T --> ExpP : 寫回／還原／下載 CSV
-TDash --> RTable
-TDash --> ExpP
-RTable --> UT
-ExpP --> UT
+TDash --> RTable : props（view、busy、onReject）
+TDash --> ExpP : props（phase、busy、\nonExport／onRestore／onDownload）
+TDash --> UT
 UT --> Http : REST 指令
 
 S --> SRes : 檢視結果
-Play --> SRes
-Play --> Card
+Play --> SRes : props（results）
+Play --> Card : props（mySubmission：rejected）
 
 Http --> Svc
 Svc --> Phase : assertPhase
