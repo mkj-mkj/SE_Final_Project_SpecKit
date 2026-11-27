@@ -1,11 +1,14 @@
 // 老師管理頁（TECH_SPEC §10.1、§10.4）：無活動時只顯示建立按鈕；有活動顯示房間碼、匯入（SETUP／READY）、設定與組別；
-// 003：READY／RUNNING／ENDED 顯示控制列，RUNNING／ENDED 顯示即時狀態表（ResultsTable 屬 004）
+// 003：READY／RUNNING／ENDED 顯示控制列，RUNNING／ENDED 顯示即時狀態表；
+// 004：RUNNING／ENDED 於狀態表下方顯示結果表（判錯入口，plan D2），READY／ENDED 顯示寫回／還原／CSV
 import { Navigate, useNavigate } from 'react-router-dom';
 import ControlBar from '../components/ControlBar';
 import ErrorBanner from '../components/ErrorBanner';
+import ExportPanel from '../components/ExportPanel';
 import ImportForm from '../components/ImportForm';
 import ImportSummary from '../components/ImportSummary';
 import PhaseBadge from '../components/PhaseBadge';
+import ResultsTable from '../components/ResultsTable';
 import RoomCode from '../components/RoomCode';
 import SettingsForm from '../components/SettingsForm';
 import StatusGrid from '../components/StatusGrid';
@@ -21,12 +24,16 @@ export default function TeacherDashboard() {
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { view, error, busy, createSession, updateSettings, importSheet, start, end, reset } = useTeacher();
+  const {
+    view, error, busy, createSession, updateSettings, importSheet, start, end, reset,
+    rejectWinner, exportToSheet, restoreSheet, downloadCsv,
+  } = useTeacher();
   const now = useServerClock(view?.serverNow);
   const phase = view?.session.phase ?? null;
   const canImport = phase === 'SETUP' || phase === 'READY';
   const showControls = phase === 'READY' || phase === 'RUNNING' || phase === 'ENDED';
   const showGrid = phase === 'RUNNING' || phase === 'ENDED';
+  const showExport = phase === 'READY' || phase === 'ENDED';
 
   // 登出：清除身分並離開本頁（卸載時 useTeacher 會中斷 Socket）；不呼叫伺服器
   function logout() {
@@ -68,6 +75,25 @@ function Dashboard() {
             <section>
               <h2>即時狀態</h2>
               <StatusGrid view={view} now={now} />
+            </section>
+          )}
+          {showGrid && (
+            <section>
+              <h2>結果</h2>
+              {/* 判錯失敗（如 NO_WINNER）由上方 ErrorBanner 顯示 */}
+              <ResultsTable view={view} busy={busy} onReject={(qid) => { rejectWinner(qid).catch(() => undefined); }} />
+            </section>
+          )}
+          {showExport && (
+            <section>
+              <h2>寫回與匯出</h2>
+              <ExportPanel
+                phase={view.session.phase}
+                busy={busy}
+                onExport={exportToSheet}
+                onRestore={restoreSheet}
+                onDownload={downloadCsv}
+              />
             </section>
           )}
           {(canImport || view.importSummary) && (

@@ -1,4 +1,4 @@
-// 學生作答卡（TECH_SPEC §10.4 AnswerCard 狀態表；rejected 屬 004）
+// 學生作答卡（TECH_SPEC §10.4 AnswerCard 狀態表；rejected 列為 004）
 // RUNNING 中只顯示「已送出」，不顯示得主、順位或分數（FR-10）
 import type { Phase, QuestionInfo, TeamView } from '@quiz/shared';
 import { formatClock } from '../format';
@@ -20,9 +20,12 @@ export default function AnswerCard({ question, phase, answers, mySubmission, now
   const n = question.number;
   const running = phase === 'RUNNING';
   const active = mySubmission?.status === 'active' ? mySubmission : null;
-  // 未送出或已撤回時可編輯；已送出（active）時鎖定並顯示送出的答案
-  const editable = running && !active;
-  const shown = active ? active.answers : answers;
+  // 被老師判錯：只涉及本組自己的送出，顯示不違反 FR-10；不可重送也不可撤回
+  const rejected = mySubmission?.status === 'rejected' ? mySubmission : null;
+  const locked = active ?? rejected;
+  // 未送出或已撤回時可編輯；已送出（active）或被判錯時鎖定並顯示送出的答案
+  const editable = running && !locked;
+  const shown = locked ? locked.answers : answers;
   const values = Array.from({ length: question.subCount }, (_, i) => shown[i] ?? '');
   const canSubmit = editable && values.every((v) => v.trim() !== '');
 
@@ -52,7 +55,9 @@ export default function AnswerCard({ question, phase, answers, mySubmission, now
           </label>
         ))}
       </div>
-      {active ? (
+      {rejected ? (
+        <p className="answer-rejected">老師判定此答案錯誤</p>
+      ) : active ? (
         <div className="answer-submitted">
           <span data-testid={`submitted-${n}`}>已送出 {formatClock(active.serverTime)}</span>
           {remaining > 0 && (

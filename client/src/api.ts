@@ -1,5 +1,6 @@
 // REST 用戶端（contracts/rest-api.md）；非 2xx 時丟出 AppErrorView
 import type {
+  CellWrite,
   ErrorCode,
   FairnessMode,
   ImportSummary,
@@ -42,14 +43,16 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   }
 
   const data: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    const body = (data as { error?: unknown } | null)?.error;
-    const err: AppErrorView = isAppErrorView(body)
-      ? { code: body.code, message: body.message }
-      : { code: 'INTERNAL', message: `HTTP ${res.status}` };
-    throw err;
-  }
+  if (!res.ok) throw toErrorView(res.status, data);
   return data as T;
+}
+
+/** 非 2xx 回應本文 → AppErrorView（request() 與 downloadCsv() 共用） */
+function toErrorView(status: number, data: unknown): AppErrorView {
+  const body = (data as { error?: unknown } | null)?.error;
+  return isAppErrorView(body)
+    ? { code: body.code, message: body.message }
+    : { code: 'INTERNAL', message: `HTTP ${status}` };
 }
 
 // ---------- 老師 ----------
@@ -91,6 +94,45 @@ export function end(token: string, sessionId: string): Promise<TeacherView> {
 }
 export function reset(token: string, sessionId: string): Promise<TeacherView> {
   return phaseAction(token, sessionId, 'reset');
+}
+
+// ---------- 老師：結果與匯出（004，contracts/rest-api.md） ----------
+function sessionPath(sessionId: string): string {
+  return `/api/teacher/sessions/${encodeURIComponent(sessionId)}`;
+}
+/** 判錯：目前得主改為 rejected，回傳遞補後的 TeacherView */
+export function rejectWinner(token: string, sessionId: string, questionId: string): Promise<TeacherView> {
+  return request(`${sessionPath(sessionId)}/questions/${encodeURIComponent(questionId)}/reject-winner`, {
+    method: 'POST', token,
+  });
+}
+export function exportSheet(token: string, sessionId: string): Promise<{ updatedCells: number; writes: CellWrite[] }> {
+  return request(`${sessionPath(sessionId)}/export`, { method: 'POST', token });
+}
+export function restoreSheet(token: string, sessionId: string): Promise<{ updatedCells: number }> {
+  return request(`${sessionPath(sessionId)}/restore`, { method: 'POST', token });
+}
+
+/**
+ * 下載結果 CSV（research R-10）：老師 token 只在 sessionStorage，不能用一般連結，
+ * 因此以 fetch 帶 Authorization 取得 blob；檔名取自 Content-Disposition，取不到時為 results.csv。
+ */
+export async function downloadCsv(token: string, sessionId: string): Promise<{ blob: Blob; filename: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${sessionPath(sessionId)}/export.csv`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) {
+    const err: AppErrorView = { code: 'INTERNAL', message: e instanceof Error ? e.message : String(e) };
+    throw err;
+  }
+  if (!res.ok) {
+    const data: unknown = await res.json().catch(() => null);
+    throw toErrorView(res.status, data);
+  }
+  const match = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+  return { blob: await res.blob(), filename: match?.[1] ?? 'results.csv' };
 }
 
 // ---------- 公開 ----------

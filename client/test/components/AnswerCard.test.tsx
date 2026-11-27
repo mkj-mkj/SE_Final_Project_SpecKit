@@ -177,4 +177,17 @@ describe('AnswerCard', () => {
     expect(screen.queryByTestId('submitted-1')).toBeNull();
     expect(screen.queryByTestId('btn-withdraw-1')).toBeNull();
   });
+
+  it('UT-UI-CARD-06 rejected 時輸入 disabled 並顯示原答案、顯示「老師判定此答案錯誤」、無送出與撤回按鈕', () => {
+    const mine: MySub = {
+      id: 'sub-3', answers: ['0'], submittedBy: '小明', serverTime: Date.now() - 2000,
+      status: 'rejected', withdrawableUntil: null,
+    };
+    renderCard({ answers: [''], mySubmission: mine });
+    expect(screen.getByTestId('answer-input-3-1')).toBeDisabled();
+    expect(screen.getByTestId('answer-input-3-1')).toHaveValue('0');
+    expect(screen.getByText('老師判定此答案錯誤')).toBeInTheDocument();
+    expect(screen.queryByTestId('btn-submit-3')).toBeNull();
+    expect(screen.queryByTestId('btn-withdraw-3')).toBeNull();
+  });
 });
