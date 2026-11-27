@@ -1,6 +1,6 @@
 # 課堂分組搶答系統
 
-> 本檔為最小版本（004 T019 建立）；001～003 的功能說明由各子功能補充。
+> 課堂分組搶答系統：老師匯入 Google Sheets 的 Guided Notes 後，學生分組即時搶答，系統依伺服器時間決定得主並計分，結束後可判錯遞補、寫回試算表與下載 CSV。
 
 ## 功能清單
 
@@ -48,6 +48,7 @@
 
 5. 打開要匯入的試算表，按「共用」，把試算表共用給服務帳號的 email（金鑰檔中的 `client_email`，形如 `xxx@<專案>.iam.gserviceaccount.com`），權限設為「編輯者」（寫回與還原需要編輯權限）。
 6. 重新啟動伺服器後，在管理頁貼上試算表網址即可匯入。
+7. 若匯入、寫回或還原時出現「沒有權限存取試算表，請將試算表共用給服務帳號」，請確認第 5 步的共用對象是金鑰中的 `client_email`、權限為「編輯者」後再試一次。
 
 ## 如何執行
 
@@ -55,11 +56,38 @@
 
 ```sh
 npm install
-cp .env.example .env    # 設定 TEACHER_PASSWORD；SHEETS_MODE 預設 fake
-npm run dev             # 伺服器與前端
+cp .env.example .env    # Windows PowerShell：Copy-Item .env.example .env
+                        # 設定 TEACHER_PASSWORD；SHEETS_MODE 預設 fake
+npm run dev             # 伺服器與前端（開發模式）
 npm test                # 單元與整合測試
 npm run lint
 ```
+
+### 開發模式與正式建置
+
+- **開發模式**：`npm run dev` 同時啟動後端（port 3000）與前端 Vite 開發伺服器（port 5173）。請開 **http://localhost:5173**；Vite 會把 `/api` 與 `/socket.io` 轉發到 3000。此時 3000 只提供 API，直接開 http://localhost:3000 顯示 `Cannot GET /` 屬正常。
+- **正式建置**：`npm run build && npm start`，由後端（port 3000，可用 `.env` 的 `PORT` 調整）同時提供 API 與建置後的前端，請開 **http://localhost:3000**。
+- 啟動時出現 `EADDRINUSE` 表示 3000 已被占用（通常是 `npm run dev` 還在執行），先停掉它再執行 `npm start`。
+
+### 搶答示範（003）
+
+1. 開 `/teacher/login` 以 `TEACHER_PASSWORD` 登入 → 按「建立活動」→ 匯入範例 ID `fixture-template-a`（示範模式）→ 按「開始搶答」。
+2. 以多個瀏覽器視窗模擬多組：每個視窗開管理頁顯示的加入連結（`/join?room=<房間碼>`），各選不同組別並輸入暱稱。
+   - 學生身分存在 **localStorage**，同一個瀏覽器的所有分頁共用同一個學生身分，同一瀏覽器開的多個無痕視窗之間也彼此共用。要模擬多名學生，請使用**不同瀏覽器**（例：Edge 與 Chrome）、**不同的瀏覽器設定檔**，或**一般視窗＋無痕視窗**。
+   - 老師身分存在 **sessionStorage**，只限登入的那個分頁；新開分頁需重新登入。
+3. 學生作答送出後，老師的狀態表即時顯示各組答案、伺服器時間、順位與得主；同組的其他視窗可看到共編草稿與送出狀態。
+4. **公平模式視窗秒數**：在管理頁「活動設定」調整（1–10 秒，預設 3 秒）。此欄位只在判定模式為「公平」時顯示，且只有「準備中」或「等待開始」可修改，搶答中無法變更。
+
+### E2E 測試
+
+- `npm run test:e2e` 使用系統已安裝的 **Microsoft Edge**（Playwright `channel: 'msedge'`），不需執行 `npx playwright install`。
+- 測試會自動執行 `npm run build && npm start`，以 port **3100**、記憶體資料庫（`DB_PATH=:memory:`）、`SHEETS_MODE=fake` 與 E2E 專用密碼啟動，不影響 `.env` 與 `data/`。執行前請確認 3100 未被占用。
+- 測試結果輸出到 `e2e/test-results/`（已在 `.gitignore`），截圖在 `e2e/artifacts/`。
+
+### 產生 PlantUML 圖表
+
+- 需要 Java。`plantuml.jar` 不提交（已在 `.gitignore`），請從 PlantUML 官方 GitHub Releases（https://github.com/plantuml/plantuml/releases）下載後放到專案根目錄，並命名為 `plantuml.jar`。
+- 產生全部圖表：`java -jar plantuml.jar "./diagrams/*.puml"`；只產某個子功能，例：`java -jar plantuml.jar "./diagrams/004-*.puml"`。PNG 輸出在 `diagrams/` 與 `.puml` 同名。
 
 ### 示範模式（`SHEETS_MODE=fake`）
 
@@ -69,6 +97,4 @@ npm run lint
 
 ### Google 模式（`SHEETS_MODE=google`）
 
-1. 服務帳號金鑰放在 `secrets/`（不得提交），並在 `.env` 設定 `GOOGLE_APPLICATION_CREDENTIALS`。
-2. 把要使用的試算表**共用給服務帳號（編輯者）**——寫回與還原需要編輯權限。
-3. 若出現「沒有權限存取試算表，請將試算表共用給服務帳號」，請確認第 2 步的共用對象與權限後再試一次。
+設定步驟與權限錯誤的處理請見上方「[Google Sheets 服務帳號設定](#google-sheets-服務帳號設定sheets_modegoogle)」。

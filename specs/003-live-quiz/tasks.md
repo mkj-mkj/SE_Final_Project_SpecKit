@@ -240,8 +240,8 @@ description: "Task list for 003-live-quiz（依層次分 Phase：Setup → 後�
 
 ### 文件與收尾
 
-- [ ] T055 [QA] 更新 `README.md` 的「功能清單」（開始／結束／重新開始、組內共編、純速度與公平模式、撤回、斷線重連與重啟恢復）與「如何執行」（示範：老師開始後以多個瀏覽器視窗模擬多組；公平模式視窗秒數設定），依 TECH_SPEC §0 第 8 點（`README.md`）
-  - 「功能清單」已由 T064 完成；「如何執行」依指示未修改，尚未完成
+- [X] T055 [QA] 更新 `README.md` 的「功能清單」（開始／結束／重新開始、組內共編、純速度與公平模式、撤回、斷線重連與重啟恢復）與「如何執行」（示範：老師開始後以多個瀏覽器視窗模擬多組；公平模式視窗秒數設定），依 TECH_SPEC §0 第 8 點（`README.md`）
+  - 完成（2026-11-28）：「功能清單」由 T064 完成；「如何執行」補上開發／正式建置、搶答示範（多瀏覽器模擬多組、身分儲存差異、公平模式視窗秒數）、E2E、PlantUML，並把 Google 模式說明併入服務帳號設定一節
 - [X] T056 [QA] **Phase 4 驗收**：執行 `npm test` 與 `npm run lint` 全部通過（含 001、002 的測試），再執行 `npm run test:coverage`（TEST_SPEC §2.3 門檻）與 `npm run test:e2e`（E2E-01～11、18 全部通過）；確認 TECH_SPEC §14.1 003 列的每個測試 ID 都有實作且無 `it.skip`／`test.fixme`；依 quickstart.md §2、§3 走一遍；依憲章原則 11 逐項比對程式碼與 `diagrams/003-component.puml`（組件與依賴）、`diagrams/003-class.puml`（類別、公開方法、關聯）、`diagrams/003-sequence.puml`（三段互動順序），不一致時先修正並重新產生 PNG（`java -jar plantuml.jar "./diagrams/*.puml"`）（`diagrams/003-*.puml`、`server/`、`client/`）
   - 由 T066 完成
 
@@ -321,7 +321,7 @@ T051 concurrency.it.test.ts、T052 restart.it.test.ts、T053 perf.it.test.ts
 - [X] T061 [P] [QA] [US7] 撰寫並執行 IT-RESTART-01：建立暫存檔案 DB，fair 模式送出後關閉 app，`clock.advance(5000)` 後用同一個 DB 重啟，並走 `recoverOnBoot(serviceOf(app))` → 該題已結算、老師 view 顯示得主；測試結束刪除暫存檔 per T052、FR-043、SC-008 (missing)（`server/test/integration/restart.it.test.ts`）
 - [X] T062 [P] [QA] [US2] 撰寫並執行 IT-PERF-01（`startApp({ realTime: true })`）：10 組 × 4 個學生 socket 加 1 個老師 socket，連續送出 20 次，從送出到老師收到 `teacher:state` 的 p95 < 500 ms per T053、FR-044、SC-003 (missing)（`server/test/integration/perf.it.test.ts`）
 - [X] T063 [QA] 撰寫並執行 E2E-04～11（斷言照 T054）。目前 repo 沒有 `e2e/` 目錄，但根目錄 `package.json` 的 workspaces 與 `test:e2e` 都引用它；**前置**：001 的 T082（`e2e/package.json`、`tsconfig.json`）與 T083（`e2e/playwright.config.ts`）必須先完成，本任務不建立 001 的檔案 per T054、FR-005、FR-008、FR-011、FR-014、FR-029、FR-035、SC-002、SC-005 (missing)（`e2e/tests/live-quiz.spec.ts`）
-- [ ] T064 [QA] 更新 `README.md`：「功能清單」補上 003 的功能（開始／結束／重新開始一輪、組內共編草稿、純速度與公平模式、撤回、斷線重連與重啟恢復），「如何執行」補上搶答示範（老師開始後以多個瀏覽器視窗模擬多組、公平模式視窗秒數）。目前 README 只有 004 的功能，檔頭寫著「001～003 的功能說明由各子功能補充」per T055、TECH_SPEC §0-8 (missing)（`README.md`）
+- [X] T064 [QA] 更新 `README.md`：「功能清單」補上 003 的功能（開始／結束／重新開始一輪、組內共編草稿、純速度與公平模式、撤回、斷線重連與重啟恢復），「如何執行」補上搶答示範（老師開始後以多個瀏覽器視窗模擬多組、公平模式視窗秒數）。目前 README 只有 004 的功能，檔頭寫著「001～003 的功能說明由各子功能補充」per T055、TECH_SPEC §0-8 (missing)（`README.md`）
   - 「功能清單」003 部分已完成；「如何執行」依指示未修改，尚未完成
 - [X] T065 [BE] 更新 `sessionService.ts` 檔頭註解：003 那一行仍寫「submit（純速度）」，並漏列 withdraw、settleWindow、recover，改成與目前實作一致（憲章 I：重要業務邏輯的繁中註解要正確）per T020、T024、T026、Constitution I (partial)（`server/src/services/sessionService.ts`）
 - [X] T066 [QA] **Convergence 驗收**（取代仍未勾選的 T056）：T057～T065 完成後，執行 `npm test`、`npm run lint`、`npm run test:coverage`（TEST_SPEC §2.3 門檻）、`npm run test:e2e`（E2E-01～11、18）；確認 TECH_SPEC §14.1 003 列的 IT-PHASE-01、IT-VAL-01、IT-VIS-01、IT-SYNC-01、IT-RT-01、IT-RECON-01～02、IT-CONC-01、IT-RESTART-01、IT-PERF-01、E2E-04～11 都有測試、沒有 `it.skip`／`test.fixme`；依 quickstart.md §2、§3 走一遍；依憲章原則 XI 再比對一次程式碼與 `diagrams/003-component.puml`、`003-class.puml`、`003-sequence.puml`，不一致時先修正並重新產生 PNG per T056、Constitution XI (missing)（`diagrams/003-*.puml`、`server/`、`client/`、`e2e/`）

@@ -127,10 +127,10 @@
 
 **Google 模式（需要真實 Google 服務帳號）**
 
-| ID | 項目 | 結果 |
-| --- | --- | --- |
-| MA-01 | 依 README「Google Sheets 服務帳號設定」建立服務帳號、啟用 Sheets API、金鑰放 `secrets/service-account.json`、`.env` 設 `SHEETS_MODE=google` 後可啟動 | **待 Kevin 執行** |
-| MA-02 | 把 `fixtures/sheets/template-a.xlsx`、`template-b.xlsx` 上傳為 Google Sheets 並共用給服務帳號後匯入：A 為 4 題、2 題組；B 為 6 題、0 題組（同 E2E-01、02） | **待 Kevin 執行**（依賴 MA-01） |
+| ID | 項目 | 結果 | 日期／執行者 | 截圖 |
+| --- | --- | --- | --- | --- |
+| MA-01 | 依 README「Google Sheets 服務帳號設定」建立服務帳號、啟用 Sheets API、金鑰放 `secrets/service-account.json`、`.env` 設 `SHEETS_MODE=google` 後可啟動 | 通過：伺服器以 `SHEETS_MODE=google` 啟動，首頁正常顯示 | 2026-11-28／Kevin | [ma-01-start.png](screenshots/ma-01-start.png) |
+| MA-02 | 把 `fixtures/sheets/template-a.xlsx`、`template-b.xlsx` 上傳為 Google Sheets 並共用給服務帳號後匯入：A 為 4 題、2 題組；B 為 6 題、0 題組（同 E2E-01、02） | 通過：A 匯入顯示「偵測到 4 題，其中 2 題組（共 4 子題）、2 單題」（第 1、2 題為題組（1）（2），第 3、4 題單題）；B 匯入顯示「偵測到 6 題，其中 0 題組（共 0 子題）、6 單題」（第 1～6 題）——與 E2E-01、02 一致 | 2026-11-28／Kevin | [ma-02-a.png](screenshots/ma-02-a.png)、[ma-02-b.png](screenshots/ma-02-b.png) |
 
 **SC-003 其他 Guided Notes（如有）**
 
@@ -170,3 +170,18 @@
   - `002-component.puml`：TeacherDashboard／ImportForm／ImportSummary／ErrorBanner／useTeacher 的顯示條件與 `data-testid` 與 `client/src` 一致；`index.ts` 依 `SHEETS_MODE` 組裝 `createGoogleGateway`／`createFakeGateway`，`app.ts` 只在有 fake gateway 時掛載 `/api/dev`；parser → `toA1`、googleGateway → `quoteSheet`、SessionService → `parseSpreadsheetInput`／`fetchSnapshot`／`parseGuidedNotes`／Repo／Broadcaster 連線皆存在。googleGateway 另使用 `rangeA1`，僅在 `writeCells`（圖中標示由 004 實作），不屬 002 互動。
   - `002-class.puml`：GridRange、SheetData、SheetSnapshot、CellWrite、ParseWarning(Code)、ParseResult、ParsedQuestion、ParsedSlot、ImportSummary、Session、Question、AnswerSlot、QuestionInfo 欄位與 `shared/src/types.ts` 逐欄一致；`a1` 五個匯出函式、`parseGuidedNotes`／`summarize`、`questionInfo(q, slots)`、`SheetsGateway` 兩個方法、`createFakeGateway(dir, outDir?)` 的 `getSnapshot`／`reset`、`devRoutes(fake)`、`SessionAggregate.importSummary`、Repo 七個方法與 `importSheet` 簽名皆一致。
   - `002-sequence.puml`：`importSheet` 依序 `assertPhase` → `parseSpreadsheetInput` → `fetchSnapshot` → `parseGuidedNotes` → `summarize` → 交易內 `nextPhase`（含 assertPhase）→ 刪除舊題目 → 寫入題目／作答格／摘要 → 交易後 `publish`；失敗分支在交易前丟錯、不寫入不推播，與 `server/src/services/sessionService.ts` 一致。
+
+## 004-results-export
+
+### T041 手動驗收（Google 模式）
+
+`SHEETS_MODE=google`，試算表為範例 A（`template-a.xlsx` 上傳為 Google Sheets）。MA-06～08 待組員執行。
+
+| ID | 項目 | 結果 | 日期／執行者 | 截圖 |
+| --- | --- | --- | --- | --- |
+| MA-03 | 真實寫回：前後截圖比對作答格為「前綴＋答案」，格式、合併與其他儲存格不變 | 通過：寫回後作答格依序為 G5「（1）A」、G6「（2）B」、G8「（1）123」、G9「（2）456」、G11「test123456」、G13「asdfgvb」——題組子題保留原前綴「（1）」「（2）」、單題只寫答案；題號、題目敘述、框線與題號欄的縱向合併與寫回前相同（依截圖比對） | 2026-11-28／Kevin | [ma-03-before.png](screenshots/ma-03-before.png)、[ma-03-after.png](screenshots/ma-03-after.png) |
+| MA-04 | 真實還原：還原後與匯入前一致 | 通過：按「還原原始內容」後管理頁顯示「已還原 6 格」；試算表 G5、G6、G8、G9 恢復為「（1）」「（2）」前綴、G11、G13 恢復為空白，與 ma-03-before 一致 | 2026-11-28／Kevin | [ma-04-restored.png](screenshots/ma-04-restored.png) |
+| MA-05 | 未共用給服務帳號的試算表 → 權限錯誤訊息 | 通過：顯示「沒有權限存取試算表，請將試算表共用給服務帳號」 | 2026-11-28／Kevin | [ma-05-denied.png](screenshots/ma-05-denied.png) |
+| MA-06 | 老師＋3 組（含 1 組 2 人）四分割完成一輪 | 待組員執行 | | |
+| MA-07 | `git log -p` 搜尋 `private_key`、`TEACHER_PASSWORD=` 實值 → 無結果 | 待組員執行 | | |
+| MA-08 | spec、`diagrams/*.puml`、README 功能清單、Demo 內容逐項一致 | 待組員執行 | | |
