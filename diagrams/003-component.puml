@@ -7,7 +7,7 @@ actor 老師 as T
 actor "學生（組員）" as S
 
 package "瀏覽器（老師端）" {
-  [管理頁\nTeacherDashboard\n(RUNNING 時顯示 StatusGrid；\n呼叫 useTeacher、useServerClock，以 props 傳給子元件)] as TDash
+  [管理頁\nTeacherDashboard\n(RUNNING／ENDED 時顯示 StatusGrid；\n呼叫 useTeacher、useServerClock，以 props 傳給子元件)] as TDash
   [控制列 ControlBar\n(btn-start／btn-end／btn-reset；\n依階段只有一個可按；props：onStart／onEnd／onReset)] as Ctrl
   [即時狀態表 StatusGrid\n(status-grid、status-cell-{q}-{team}、question-state-{q}；\n— ／答案·送出者·HH:mm:ss.SSS·#順位或「判定中」／★ 得主／已撤回／✗ 判錯)] as Grid
   [useTeacher\n(start、end、reset)] as UT
@@ -72,7 +72,7 @@ Svc --> Rank : 得主、分數（衍生）
 Svc --> Settle : 名次鍵、公平排序
 Settle ..> Rank : 分數來自 teamScores
 Svc --> Sched : 開視窗 schedule／撤回或結束 cancel
-Sched --> Svc : 到期 → settleWindow(qid)
+Sched --> Svc : 到期 → onWindowDue → 依序 settleWindow
 Recover --> Svc : recover()（index.ts 啟動時、listen 前）
 Svc --> Repo : 單一同步交易
 Repo --> DB

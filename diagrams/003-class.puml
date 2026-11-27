@@ -264,7 +264,7 @@ SessionService ..> ranking : teamScores、winnerOf
 SessionService ..> settlement : nextOrderKey、sortFairCandidates、assignOrderKeys
 SessionService ..> Submission : 建立／撤回
 SessionService ..> Draft : upsert／刪除
-Scheduler ..> SessionService : window:{qid} 到期 → settleWindow
+Scheduler ..> SessionService : window:{qid} 到期 → onWindowDue → 依序 settleWindow
 recover ..> SessionService
 
 ' 版面：以隱藏連線讓各區塊縱向排列

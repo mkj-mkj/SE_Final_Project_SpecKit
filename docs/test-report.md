@@ -1,4 +1,4 @@
-# 測試報告 2026-11-28 cb89b1b（+ 003 Phase 4 E2E：T063／T054、README：T064，未提交）
+# 測試報告 2026-11-28 b3c590b（+ 003 Convergence 驗收 T066，未提交）
 
 ## 摘要
 
@@ -13,12 +13,12 @@
 
 | 範圍 | Lines | Branches | 門檻 | 結果 |
 |---|---|---|---|---|
-| 全專案 | 85.56% | 88.87% | 80 / 75 | 通過 |
-| `server/src/domain/**` | 99.64% | 96.96% | 95 / 90 | 通過 |
+| 全專案 | 86.84% | 89.12% | 80 / 75 | 通過 |
+| `server/src/domain/**` | 99.64% | 97.03% | 95 / 90 | 通過 |
 | `server/src/sheets/parser.ts` | 100% | 95.31% | 95 / 90 | 通過 |
 | `server/src/sheets/exporter.ts` | 100% | 92.85% | 95 / 90 | 通過 |
 | `server/src/export/**` | 100% | 100% | 95 / 90 | 通過 |
-| `server/src/services/**` | 98.99% | 93.56% | 90 / 85 | 通過 |
+| `server/src/services/**` | 98.99% | 93.59% | 90 / 85 | 通過 |
 | `shared/src/**` | 100% | 100% | 90 / 85 | 通過 |
 
 排除清單：`server/src/index.ts`。例外模組逐檔數值見 `docs/manual-test.md` 001 段落。
@@ -84,6 +84,36 @@ TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目
 - 採用的假設：不視為產品缺陷；`client/test/` 不在本次任務可修改範圍，未修改。
 - 影響的測試：UT-UI-PLAY-03
 
+## 003 Convergence 驗收（T066，取代 T056）
+
+執行環境：commit b3c590b（T065 已合入），Windows 11、Node 22、E2E 使用 Edge。
+
+| 檢查 | 指令／方式 | 結果 |
+|---|---|---|
+| UT＋IT | `npm test` | 51 檔、298/298 通過 |
+| Lint＋型別 | `npm run lint` | 無錯誤（eslint、4 個 workspace typecheck） |
+| 覆蓋率 | `npm run test:coverage` | 結束碼 0，§2.3 門檻全部達成（數值見上方覆蓋率表） |
+| E2E | `npm run test:e2e` | 12/12 通過（E2E-01～11、18） |
+| skip 檢查 | `grep` `*/test/**`、`e2e/tests` 的 `.skip(`／`.fixme(`／`.only(`／`.todo(` | 0 筆 |
+| 003 測試 ID | IT-PHASE-01、IT-VAL-01、IT-VIS-01、IT-SYNC-01、IT-RT-01（`live.it.test.ts`）、IT-RECON-01～02（`recon.it.test.ts`）、IT-CONC-01（`concurrency.it.test.ts`）、IT-RESTART-01（`restart.it.test.ts`）、IT-PERF-01（`perf.it.test.ts`）、E2E-04～11（`live-quiz.spec.ts`） | 全部有對應測試名稱且通過 |
+| quickstart §2 API 煙霧測試 | 以腳本對 `server/dist` 實機（PORT 3200、`DB_PATH=:memory:`、`SHEETS_MODE=fake`）依序執行步驟 1～11 | 11/11 通過（4：409 INVALID_PHASE；6：第 1 組 rank 1 得主、第 2 組 rank 2；7：第 2 組 `/api/play/state` 不含「0」、第 1 組成員 id／暱稱／送出 id、`rank`、`isWinner`、`windowEndsAt`；8：409 ALREADY_SUBMITTED、422 GROUP_INCOMPLETE；9：撤回 204、第 2 組遞補得主、分數 0／1；10：ENDED 且 results 含 4 題；11：READY、round 2、cells 全為 null） |
+| quickstart §3 手動畫面 | #1→E2E-05、#2→E2E-06、#5→E2E-09＋UT-UI-CARD-05、#6→E2E-11＋UT-UI-GRID-02 已由自動化涵蓋 | #3（純速度模式格子完整格式）、#4（重整後倒數約 7 秒）、#7（真實停機重啟與離線→上線）人工於瀏覽器驗證通過 |
+| PlantUML 語法 | `java -jar plantuml.jar -checkonly "./diagrams/003-*.puml"` | 無錯誤 |
+| 圖表一致性（憲章 XI） | 逐項比對 `003-component`、`003-class`、`003-sequence` 與 `server/src`、`client/src` | 時序圖三段、類別圖的實體／視圖／domain 函式／ports／Repo 15 個方法／SessionService 003 方法、組件圖的前後端依賴皆一致；發現 2 處標示不精確（Q-004），已修正並重新產生 PNG（`java -jar plantuml.jar "./diagrams/003-*.puml"` 無錯誤） |
+
+§2 煙霧測試說明：quickstart 寫 `npm run dev`，本次改用 E2E 剛建置的 `server/dist`（同一份程式碼）並以 `:memory:` DB 執行，避免動到 `./data/quiz.db`。步驟 10 第 3 題的 ranking 只有第 2 組，因第 1 組的送出已在步驟 9 撤回（withdrawn 不列入 ranking，符合 Results 型別的 `status: 'active' | 'rejected'`）。
+
+本次未發現產品缺陷。
+
+### Q-004 003 圖表與程式碼的 2 處標示差異
+- 相關條文：憲章原則 XI；`diagrams/003-component.puml`、`diagrams/003-class.puml`
+- 觀察：
+  1. 組件圖 `Sched --> Svc : 到期 → settleWindow(qid)`、類別圖 `Scheduler ..> SessionService : window:{qid} 到期 → settleWindow`：實際排程回呼是 private `onWindowDue(sessionId)`，它取同活動所有已到期視窗、依 (windowEndsAt, 題號) 逐題呼叫 `settleWindow`（`server/src/services/sessionService.ts` 的 `submit` 8b 與 `recover`）。時序圖第二段已正確描述。
+  2. 組件圖 TeacherDashboard 寫「RUNNING 時顯示 StatusGrid」：實際 `showGrid = phase === 'RUNNING' || phase === 'ENDED'`（`client/src/pages/TeacherDashboard.tsx:35`），ENDED 也顯示（004 判錯需要）。
+- 採用的假設：屬圖表標示不精確，不是產品缺陷。
+- 處理：經確認後，組件圖與類別圖改為「到期 → onWindowDue → 依序 settleWindow」，組件圖 TeacherDashboard 改為「RUNNING／ENDED 時顯示 StatusGrid」，並重新產生 `003-component.png`、`003-class.png`。已解決。
+- 影響的測試：無
+
 ## 驗收結論：不通過（001～003 自動化範圍內全部通過）
 
-未滿足的 §8.1 條件：1、3（004 的 E2E-12～17 尚未實作；003 的 T066 Convergence 驗收待 T065 後執行）；5（MA-01、MA-02 待 Kevin 以真實 Google 服務帳號執行；MA-03～08 屬 004）。001、002 範圍內其餘自動化與手動驗收項目全部通過。
+未滿足的 §8.1 條件：1、3（004 的 E2E-12～17 尚未實作；003 的 T066 Convergence 驗收已完成）；5（MA-01、MA-02 待 Kevin 以真實 Google 服務帳號執行；MA-03～08 屬 004）。001、002 範圍內其餘自動化與手動驗收項目全部通過。
