@@ -64,7 +64,8 @@ BC --> TC : teacher:state（第2組 ★ 得主、第1組 #2）
 note over Svc, Sch
   多題同時到期（排程回呼依序呼叫 settleWindow）、或老師按「結束搶答」時，
   依 (windowEndsAt, 題號) 順序逐題 settleWindow，
-  前一題結果影響後一題分數；end 會 cancel 所有視窗後才 phase=ENDED
+  前一題結果影響後一題分數；end 在同一交易內逐題結算後才 phase=ENDED，
+  COMMIT 後 cancel 這些視窗的排程，最後只 publish 一次
 end note
 
 == 三、撤回後遞補（純速度模式，第1組為第 3 題得主、第2組 #2） ==
@@ -77,8 +78,10 @@ group 單一同步交易
   Svc -> DB : status=withdrawn；withdrawnAt=now
   alt 題目 state=window 且已無 active 候選
     Svc -> DB : state=open；windowEndsAt=null
-    Svc -> Sch : cancel("window:{qid}")
   end
+end
+opt 題目由 window 回到 open（COMMIT 後）
+  Svc -> Sch : cancel("window:{qid}")
 end
 Svc -> BC : publish
 BC -> Dom : rankSubmissions：排除 withdrawn → 第2組 rank 1；\nwinnerOf → 第2組；teamScores 重算
