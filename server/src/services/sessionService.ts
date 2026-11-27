@@ -358,7 +358,11 @@ export class SessionService {
   /**
    * 寫回 Google Sheets（FR-06、PRD §8 第 9 點）：只有已結束可寫回。
    * 每題最終得主（winnerOf，已反映判錯與撤回）的答案寫入匯入時記錄的作答格，位置只來自 answer_slots；
-   * 無得主的題目不寫。沒有任何寫入時不呼叫試算表 API。不推播、不寫資料庫。
+   * 無得主的題目原則上不寫。沒有任何寫入時不呼叫試算表 API。不推播、不寫資料庫。
+   *
+   * 例外（plan D1、PRD §8 第 9 點）：題目因判錯而沒有得主（winnerOf 為 null 且有 rejected 送出）時，
+   * 該題作答格恢復為匯入時的原始值——先前寫回的錯誤答案會被清掉，讓試算表與「以最終得主為準」一致（E5）。
+   * 從未被判錯、本來就沒人答對的題目仍不寫，保留老師可能手動填的內容。
    */
   async exportToSheet(sessionId: string): Promise<{ updatedCells: number; writes: CellWrite[] }> {
     const agg = this.loadAggregate(sessionId);
@@ -366,11 +370,22 @@ export class SessionService {
     const spreadsheetId = agg.session.spreadsheetId;
     if (!spreadsheetId) throw new AppError('INVALID_PHASE');
     const winners = new Map<string, Submission>();
+    const rejectedToNone = new Set<string>();
     for (const [questionId, subs] of groupByQuestion(agg.submissions)) {
       const w = winnerOf(subs);
       if (w) winners.set(questionId, w);
+      else if (subs.some((s) => s.status === 'rejected')) rejectedToNone.add(questionId);
     }
-    const writes = buildExportWrites(agg.slots, agg.questions, winners);
+    const slotPos = new Map(agg.slots.map((s) => [`${s.sheetTitle}!${s.a1}`, s]));
+    const writes = [
+      ...buildExportWrites(agg.slots, agg.questions, winners),
+      ...buildRestoreWrites(agg.slots.filter((s) => rejectedToNone.has(s.questionId))),
+    ].sort((a, b) => {
+      // 合併後依對應 slot 的工作表 → 列 → 欄排序（與 exporter 相同順序）
+      const sa = slotPos.get(`${a.sheetTitle}!${a.a1}`)!;
+      const sb = slotPos.get(`${b.sheetTitle}!${b.a1}`)!;
+      return sa.sheetTitle.localeCompare(sb.sheetTitle) || sa.row - sb.row || sa.col - sb.col;
+    });
     if (writes.length > 0) await this.deps.sheets.writeCells(spreadsheetId, writes);
     return { updatedCells: writes.length, writes };
   }

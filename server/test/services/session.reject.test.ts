@@ -1,5 +1,5 @@
-// UT-SVC-REJ-01～06（TEST_SPEC §5.6）：老師判錯與遞補（PRD E5）。
-// UT-SVC-REJ-07（plan D1：判錯到無得主的題目寫回時恢復原始值）待 docs/ 同步後再加入（tasks 規則 2）。
+// UT-SVC-REJ-01～07（TEST_SPEC §5.6）：老師判錯與遞補（PRD E5）；
+// 07 為 plan D1：判錯到無人遞補的題目，寫回時恢復該題作答格的原始值（PRD §8 第 9 點例外）。
 import { AppError } from '@quiz/shared';
 import { describe, expect, it } from 'vitest';
 import { makeTestService } from '../helpers/makeTestService.js';
@@ -136,5 +136,20 @@ describe('SessionService.rejectWinner（判錯與遞補）', () => {
     await t.service.exportToSheet(sessionId);
     const writes = t.gateway.writes.at(-1)!.writes;
     expect(writes.find((w) => w.a1 === 'G11')).toEqual({ sheetTitle: '學習單', a1: 'G11', value: '1' });
+  });
+
+  it('UT-SVC-REJ-07 第 3 題唯一送出被判錯（無人遞補）後匯出 → G11 寫回 originalValue；未送出的題目不寫', async () => {
+    const t = makeTestService();
+    const { sessionId, tokens, q } = await seedRunning(t);
+    t.service.submit(tokens[0]![0]!, q[3]!, ['0']);
+    t.service.end(sessionId);
+    t.service.rejectWinner(sessionId, q[3]!);
+    const g11 = t.repo.listSlotsBySession(sessionId).find((s) => s.a1 === 'G11')!;
+    const result = await t.service.exportToSheet(sessionId);
+    const writes = t.gateway.writes.at(-1)!.writes;
+    // 只有第 3 題的作答格被恢復為匯入時的原始值；第 1、2、4 題沒有送出也沒有判錯，不產生寫入
+    expect(writes).toEqual([{ sheetTitle: '學習單', a1: 'G11', value: g11.originalValue }]);
+    expect(result.updatedCells).toBe(1);
+    expect(result.writes).toEqual(writes);
   });
 });
