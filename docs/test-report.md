@@ -1,11 +1,11 @@
-# 測試報告 2026-11-28 b3c590b（+ 003 Convergence 驗收 T066，未提交）
+# 測試報告 2026-11-28 ac95b20（+ 004 Phase 4 T034–T039，未提交）
 
 ## 摘要
 
 | 層級 | 案例數 | 通過 | 失敗 | 略過 |
 |---|---|---|---|---|
-| UT + IT（`npm test`） | 298 | 298 | 0 | 0 |
-| E2E（`npm run test:e2e`，001～003 範圍：E2E-03、18、01、02、04～11） | 12 | 12 | 0 | 0 |
+| UT + IT（`npm test`） | 301 | 301 | 0 | 0 |
+| E2E（`npm run test:e2e`，E2E-01～18） | 18 | 18 | 0 | 0 |
 | MA（001 手動驗收 T089、T093） | 13 | 13 | 0 | 0 |
 | MA（002：MA-09 通過；MA-01、02 待 Kevin 執行） | 3 | 1 | 0 | 2（未執行） |
 
@@ -114,6 +114,29 @@ TECH_SPEC §14.1 001 列、002 列（見 `docs/manual-test.md`）自動化項目
 - 處理：經確認後，組件圖與類別圖改為「到期 → onWindowDue → 依序 settleWindow」，組件圖 TeacherDashboard 改為「RUNNING／ENDED 時顯示 StatusGrid」，並重新產生 `003-component.png`、`003-class.png`。已解決。
 - 影響的測試：無
 
-## 驗收結論：不通過（001～003 自動化範圍內全部通過）
+## 004 Phase 4 補充（T034–T039）
 
-未滿足的 §8.1 條件：1、3（004 的 E2E-12～17 尚未實作；003 的 T066 Convergence 驗收已完成）；5（MA-01、MA-02 待 Kevin 以真實 Google 服務帳號執行；MA-03～08 屬 004）。001、002 範圍內其餘自動化與手動驗收項目全部通過。
+- T034：`startApp(opts?)` 新增 `opts.fakeSheets`：true 時改用 `createFakeGateway(<repo>/fixtures/sheets)`（不傳 outDir，不寫檔）並傳入 `fakeSheets` 掛載 `/api/dev/fake-sheets/*`；回傳值新增 `fakeSheets`，`gateway` 型別放寬為 `SheetsGateway`（既有 IT 未使用 InMemory 專屬方法）。`flow.ts` 新增 `rejectWinner`、`exportSheet`、`restoreSheet`、`getCsv`（回傳 `{ status, headers, text }`，保留 BOM）、`getFakeSheet`，另加 `withdraw`（IT-FLOW-01 的 E4 步驟需要）。001～003 的 IT 未修改且全部通過。
+- T035：`results.it.test.ts` IT-FLOW-01 通過：RUNNING 中 export → 409；end 後第 1、3 題得主為第 1 組，第 4 題因撤回無得主；判錯第 3 題 → 第 2 組遞補；export → `updatedCells === 3`，G5「（1）CPU」、G6「（2）作業系統」、G11「1」，其餘儲存格與 fixture 相同；CSV 以 BOM 開頭；restore → 6 格，與 fixture 相同（比較方式見 Q-005）。
+- T036：IT-CSV-01 通過：`Content-Type: text/csv; charset=utf-8`、`Content-Disposition: attachment; filename="results-<roomCode>-r1.csv"`；reset → start 時下載 → 409 INVALID_PHASE；end 後檔名為 `-r2.csv`。
+- T037：`results-visibility.it.test.ts` IT-VIS-02 通過：A 送出 `SECRET-A-123`、B 隨後送出；RUNNING 中判錯 A → B 遞補；以「B 存草稿並等到自己的 team:state」作為屏障後比對，B 在 end 前收到的所有事件不含 `SECRET-A-123`、`rejected`、A 的 member id 與 submission id；A 的 `mySubmissions` 第 3 題 `status === 'rejected'`；end 後 B 的 `team:state.results` 含 A 的答案（ranking 中標 rejected）。
+- T038：新增 `e2e/tests/results-export.spec.ts`（E2E-12～17，serial，每位使用者獨立 context，只用 `data-testid`，截圖 `e2e/artifacts/E2E-12.png`～`E2E-17.png`）。前置會把既有活動（E2E-11 結束時仍在搶答中）結束並重新開始，改為純速度、3 組並重新匯入 fixture-template-a。E2E-14 從點擊到「已寫回 3 格」< 2 秒。單獨執行本 spec（新伺服器、新活動）6/6 通過；全套 18/18 通過。
+- T039：`npm test` 53 個檔案 301 個測試全部通過（新增 3 個 IT）；`npm run lint` 通過；`npm run test:e2e` 18/18 通過；`server/test`、`client/test`、`e2e/tests` 中 `it.skip`／`test.fixme`／`.only` 數量為 0。
+- 撰寫過程中 2 次失敗皆為測試寫錯（已修正測試，未改產品程式）：(1) E2E-16 原本寫死 `r1`，但全套執行時同一活動已被 reset 兩次，實際為 `r3`（產品行為正確），改為以老師 API 取得目前輪次再比對完整檔名（見 Q-006）；(2) 單獨執行時新活動為「準備中」，前置的狀態判斷補上此狀態。
+- 本次未發現產品缺陷。
+
+### Q-005 「fake sheet 與 fixture 完全相同」的比較方式
+- 相關條文：TEST_SPEC §6 IT-FLOW-01、§7 E2E-14、E2E-15；TECH_SPEC §7.4（fake 閘道 writeCells「逐筆補齊列與欄再設定值」）
+- 觀察：fixture 第 11、13 列只有 3 欄（G11、G13 為「未填」）。寫回 G11 或還原時寫入 `''` 後，fake 閘道會把該列以 `''` 補齊到 7 欄，因此還原後的 `values` 陣列與 fixture 在 JSON 表示上不同（多了尾端空字串），但每個儲存格的值相同。
+- 採用的假設：Google Sheets values API 本來就不回傳尾端空白格，「未填」與 `''` 是同一個儲存格值，屬表示方式差異而非資料錯誤，不視為缺陷。IT-FLOW-01、E2E-14、E2E-15 以「去除每列尾端 `''` 與尾端空列後逐格比對、merges 嚴格比對」判斷相同。
+- 影響的測試：IT-FLOW-01、E2E-14、E2E-15
+
+### Q-006 E2E-15、E2E-16 與 TEST_SPEC §7 規則的配合方式
+- 相關條文：TEST_SPEC §7（每個案例前呼叫 fake-sheets reset）；tasks T038 E2E-15、E2E-16
+- 觀察：(1) tasks T038 要求在 beforeEach 重設 fake sheet，E2E-14 的寫回因此在 E2E-15 開始前被清掉，直接按還原無法驗證「從寫回狀態恢復」。(2) 系統只有一個活動，全套執行時 E2E-11 與本 spec 前置各 reset 一次，下載檔名為 `r3` 而非 tasks 寫的 `r1`。
+- 採用的假設：(1) E2E-15 先按一次 `btn-export-sheet` 並確認 G5 已寫入，再按還原斷言「已還原 6 格」與 fixture 相同；(2) E2E-16 以 `GET /api/teacher/sessions/current` 取得目前 `round`，斷言檔名為 `results-<roomCode>-r<round>.csv`（單獨執行本 spec 時即為 `r1`，已實際驗證）。
+- 影響的測試：E2E-15、E2E-16
+
+## 驗收結論：不通過（001～004 自動化範圍內全部通過）
+
+未滿足的 §8.1 條件：5（MA-01、MA-02 待 Kevin 以真實 Google 服務帳號執行；004 的 MA-03～08 待 T041）。§8.1 第 1、3 條的自動化部分（§5～§7 全部案例、E2E-12～17）已實作並通過；第 2 條覆蓋率與第 7 條乾淨 clone 待 004 Phase 5（T040、T043）重新確認。001、002 範圍內其餘自動化與手動驗收項目全部通過。

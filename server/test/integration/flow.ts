@@ -1,6 +1,6 @@
 // 整合測試用 REST 流程 helper：以 fetch 呼叫真實 HTTP（只連 127.0.0.1 的測試伺服器，不用外部網路）。
 // 用法：const f = flow(t.baseUrl); await f.login(); const s = await f.createAndImport({ mode: 'speed' });
-import type { FairnessMode, PublicSessionInfo, TeacherView } from '@quiz/shared';
+import type { FairnessMode, PublicSessionInfo, SheetSnapshot, TeacherView } from '@quiz/shared';
 import type { Socket as ClientSocket } from 'socket.io-client';
 import { TEACHER_PASSWORD } from './startApp.js';
 
@@ -153,6 +153,37 @@ export function flow(baseUrl: string) {
     /** 更新本組草稿（不檢查狀態碼） */
     putDraft: (token: string, questionId: string, answers: string[]) =>
       api('PUT', `/api/play/drafts/${questionId}`, { answers }, token),
+
+    /** 撤回本組送出（不檢查狀態碼） */
+    withdraw: (token: string, submissionId: string) =>
+      api('POST', `/api/play/submissions/${submissionId}/withdraw`, undefined, token),
+
+    // ---------- 004 結果與匯出（皆不檢查狀態碼，回傳原始回應） ----------
+
+    /** 老師判錯某題目前得主（成功時 body 為最新 TeacherView） */
+    rejectWinner: (token: string, sessionId: string, questionId: string) =>
+      api<TeacherView>('POST', `/api/teacher/sessions/${sessionId}/questions/${questionId}/reject-winner`, undefined, token),
+
+    /** 寫回試算表 */
+    exportSheet: (token: string, sessionId: string) =>
+      api<{ updatedCells: number }>('POST', `/api/teacher/sessions/${sessionId}/export`, undefined, token),
+
+    /** 還原試算表 */
+    restoreSheet: (token: string, sessionId: string) =>
+      api<{ updatedCells: number }>('POST', `/api/teacher/sessions/${sessionId}/restore`, undefined, token),
+
+    /** 下載結果 CSV：保留原始文字（不 JSON 解析、不去除 BOM）與回應標頭 */
+    async getCsv(token: string, sessionId: string): Promise<{ status: number; headers: Headers; text: string }> {
+      const res = await fetch(`${baseUrl}/api/teacher/sessions/${sessionId}/export.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // TextDecoder 預設會吃掉 BOM，改用 ignoreBOM 保留
+      const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(await res.arrayBuffer());
+      return { status: res.status, headers: res.headers, text };
+    },
+
+    /** 讀取 fake 模式記憶體中的試算表（需 startApp({ fakeSheets: true })） */
+    getFakeSheet: (spreadsheetId: string) => api<SheetSnapshot>('GET', `/api/dev/fake-sheets/${spreadsheetId}`),
   };
 }
 
